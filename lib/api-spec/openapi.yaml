@@ -3,20 +3,42 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: FinVerify OS API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: demo
+    description: Demo data operations
+  - name: uploads
+    description: File upload operations
+  - name: transactions
+    description: Bank transaction operations
+  - name: invoices
+    description: Invoice operations
+  - name: ledger
+    description: Ledger entry operations
+  - name: reconciliation
+    description: Reconciliation operations
+  - name: risks
+    description: Risk flag operations
+  - name: payroll
+    description: Payroll operations
+  - name: gateway
+    description: Payment gateway settlement operations
+  - name: reports
+    description: Report operations
+  - name: overview
+    description: Dashboard overview operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +46,707 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /demo/seed:
+    post:
+      operationId: seedDemoData
+      tags: [demo]
+      summary: Seed demo data for NovaStack Labs
+      responses:
+        "200":
+          description: Demo data seeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeedResult"
+
+  /overview:
+    get:
+      operationId: getOverview
+      tags: [overview]
+      summary: Get dashboard overview stats
+      responses:
+        "200":
+          description: Overview stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverviewStats"
+
+  /uploads:
+    get:
+      operationId: getUploads
+      tags: [uploads]
+      summary: List all upload batches
+      responses:
+        "200":
+          description: List of upload batches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UploadBatch"
+    post:
+      operationId: createUpload
+      tags: [uploads]
+      summary: Create a new upload batch record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadBatchInput"
+      responses:
+        "201":
+          description: Upload batch created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadBatch"
+
+  /transactions:
+    get:
+      operationId: getTransactions
+      tags: [transactions]
+      summary: List bank transactions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: source
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BankTransaction"
+
+  /transactions/{id}/status:
+    patch:
+      operationId: updateTransactionStatus
+      tags: [transactions]
+      summary: Update transaction status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionStatusUpdate"
+      responses:
+        "200":
+          description: Transaction updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankTransaction"
+
+  /invoices:
+    get:
+      operationId: getInvoices
+      tags: [invoices]
+      summary: List invoices
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invoice"
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Create invoice record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceInput"
+      responses:
+        "201":
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /ledger:
+    get:
+      operationId: getLedgerEntries
+      tags: [ledger]
+      summary: List ledger entries
+      responses:
+        "200":
+          description: List of ledger entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LedgerEntry"
+
+  /ledger/summary:
+    get:
+      operationId: getLedgerSummary
+      tags: [ledger]
+      summary: Ledger match summary stats
+      responses:
+        "200":
+          description: Ledger match summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerSummary"
+
+  /reconciliation:
+    get:
+      operationId: getReconciliationMatches
+      tags: [reconciliation]
+      summary: List reconciliation matches
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of reconciliation matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReconciliationMatch"
+
+  /reconciliation/run:
+    post:
+      operationId: runReconciliation
+      tags: [reconciliation]
+      summary: Run reconciliation engine
+      responses:
+        "200":
+          description: Reconciliation run result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconciliationRunResult"
+
+  /reconciliation/{id}/approve:
+    post:
+      operationId: approveMatch
+      tags: [reconciliation]
+      summary: Approve a reconciliation match
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Match approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconciliationMatch"
+
+  /reconciliation/{id}/reject:
+    post:
+      operationId: rejectMatch
+      tags: [reconciliation]
+      summary: Reject a reconciliation match
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Match rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconciliationMatch"
+
+  /risks:
+    get:
+      operationId: getRiskFlags
+      tags: [risks]
+      summary: List risk flags
+      parameters:
+        - name: severity
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of risk flags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RiskFlag"
+
+  /risks/{id}/status:
+    patch:
+      operationId: updateRiskStatus
+      tags: [risks]
+      summary: Update risk flag status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiskStatusUpdate"
+      responses:
+        "200":
+          description: Risk updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskFlag"
+
+  /payroll:
+    get:
+      operationId: getPayrollEntries
+      tags: [payroll]
+      summary: List payroll entries
+      responses:
+        "200":
+          description: List of payroll entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayrollEntry"
+
+  /gateway-settlements:
+    get:
+      operationId: getGatewaySettlements
+      tags: [gateway]
+      summary: List gateway settlement records
+      responses:
+        "200":
+          description: List of gateway settlements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GatewaySettlement"
+
+  /reports/summary:
+    get:
+      operationId: getReportSummary
+      tags: [reports]
+      summary: Get CA-ready report summary
+      responses:
+        "200":
+          description: Report summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportSummary"
+
+  /reports/export-csv:
+    get:
+      operationId: exportReportCsv
+      tags: [reports]
+      summary: Export data as CSV (returns download URL)
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [transactions, risks, reconciliation, invoices, payroll]
+      responses:
+        "200":
+          description: CSV export result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResult"
+
+  /ca-review:
+    get:
+      operationId: getCaReviewItems
+      tags: [reports]
+      summary: Get CA review queue items
+      responses:
+        "200":
+          description: CA review items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaReviewItem"
+
+  /ca-review/{id}/action:
+    post:
+      operationId: processCaReviewItem
+      tags: [reports]
+      summary: Process CA review item (approve/reject/request)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaReviewAction"
+      responses:
+        "200":
+          description: CA review item updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaReviewItem"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    SeedResult:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        counts:
+          type: object
+          properties:
+            transactions: { type: integer }
+            invoices: { type: integer }
+            ledgerEntries: { type: integer }
+            payrollEntries: { type: integer }
+            gatewaySettlements: { type: integer }
+            riskFlags: { type: integer }
+
+    OverviewStats:
+      type: object
+      required: [verificationScore, totalTransactions, verifiedTransactions, unverifiedTransactions, missingInvoices, riskFlags, totalUploads, caReadyStatus, verifiedAmount, unverifiedAmount]
+      properties:
+        verificationScore: { type: integer }
+        totalTransactions: { type: integer }
+        verifiedTransactions: { type: integer }
+        unverifiedTransactions: { type: integer }
+        missingInvoices: { type: integer }
+        riskFlags: { type: integer }
+        totalUploads: { type: integer }
+        caReadyStatus: { type: string }
+        verifiedAmount: { type: number }
+        unverifiedAmount: { type: number }
+        recentUploads:
+          type: array
+          items:
+            $ref: "#/components/schemas/UploadBatch"
+        monthlyProgress:
+          type: array
+          items:
+            type: object
+            properties:
+              month: { type: string }
+              verified: { type: integer }
+              unverified: { type: integer }
+        riskByCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              category: { type: string }
+              count: { type: integer }
+              severity: { type: string }
+
+    UploadBatch:
+      type: object
+      required: [id, sourceType, fileName, status, uploadedAt]
+      properties:
+        id: { type: integer }
+        companyId: { type: ["integer", "null"] }
+        sourceType: { type: string }
+        fileName: { type: string }
+        status: { type: string }
+        uploadedAt: { type: string }
+        recordCount: { type: ["integer", "null"] }
+
+    UploadBatchInput:
+      type: object
+      required: [sourceType, fileName]
+      properties:
+        sourceType: { type: string }
+        fileName: { type: string }
+        recordCount: { type: ["integer", "null"] }
+
+    BankTransaction:
+      type: object
+      required: [id, date, narration, amount, type, source, status, confidenceScore]
+      properties:
+        id: { type: integer }
+        date: { type: string }
+        narration: { type: string }
+        amount: { type: number }
+        type: { type: string }
+        source: { type: string }
+        bankName: { type: ["string", "null"] }
+        reference: { type: ["string", "null"] }
+        status: { type: string }
+        confidenceScore: { type: integer }
+        matchedInvoiceId: { type: ["integer", "null"] }
+        note: { type: ["string", "null"] }
+
+    TransactionStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        note: { type: ["string", "null"] }
+
+    Invoice:
+      type: object
+      required: [id, invoiceNumber, vendorName, date, amount, type, status]
+      properties:
+        id: { type: integer }
+        invoiceNumber: { type: string }
+        vendorName: { type: string }
+        customerName: { type: ["string", "null"] }
+        gstin: { type: ["string", "null"] }
+        date: { type: string }
+        amount: { type: number }
+        gstAmount: { type: ["number", "null"] }
+        type: { type: string }
+        paymentStatus: { type: string }
+        status: { type: string }
+        linkedTransactionId: { type: ["integer", "null"] }
+
+    InvoiceInput:
+      type: object
+      required: [invoiceNumber, vendorName, date, amount, type]
+      properties:
+        invoiceNumber: { type: string }
+        vendorName: { type: string }
+        customerName: { type: ["string", "null"] }
+        gstin: { type: ["string", "null"] }
+        date: { type: string }
+        amount: { type: number }
+        gstAmount: { type: ["number", "null"] }
+        type: { type: string }
+
+    LedgerEntry:
+      type: object
+      required: [id, date, ledgerName, amount, debitCredit, sourceTool, status]
+      properties:
+        id: { type: integer }
+        date: { type: string }
+        ledgerName: { type: string }
+        voucherNumber: { type: ["string", "null"] }
+        amount: { type: number }
+        debitCredit: { type: string }
+        sourceTool: { type: string }
+        status: { type: string }
+        matchedTransactionId: { type: ["integer", "null"] }
+
+    LedgerSummary:
+      type: object
+      required: [totalEntries, matchedEntries, missingEntries, duplicateCount, suspenseCount, matchScore]
+      properties:
+        totalEntries: { type: integer }
+        matchedEntries: { type: integer }
+        missingEntries: { type: integer }
+        duplicateCount: { type: integer }
+        suspenseCount: { type: integer }
+        matchScore: { type: integer }
+
+    ReconciliationMatch:
+      type: object
+      required: [id, matchType, confidenceScore, reason, status, createdAt]
+      properties:
+        id: { type: integer }
+        bankTransactionId: { type: ["integer", "null"] }
+        invoiceId: { type: ["integer", "null"] }
+        ledgerEntryId: { type: ["integer", "null"] }
+        matchType: { type: string }
+        confidenceScore: { type: integer }
+        reason: { type: string }
+        status: { type: string }
+        createdAt: { type: string }
+        bankTransaction:
+          $ref: "#/components/schemas/BankTransaction"
+        invoice:
+          $ref: "#/components/schemas/Invoice"
+
+    ReconciliationRunResult:
+      type: object
+      required: [matchesFound, newVerified, newPotential, newUnverified, message]
+      properties:
+        matchesFound: { type: integer }
+        newVerified: { type: integer }
+        newPotential: { type: integer }
+        newUnverified: { type: integer }
+        message: { type: string }
+
+    RiskFlag:
+      type: object
+      required: [id, entityType, category, severity, reason, suggestedAction, status, createdAt]
+      properties:
+        id: { type: integer }
+        entityType: { type: string }
+        entityId: { type: ["integer", "null"] }
+        category: { type: string }
+        severity: { type: string }
+        reason: { type: string }
+        suggestedAction: { type: string }
+        status: { type: string }
+        createdAt: { type: string }
+
+    RiskStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+
+    PayrollEntry:
+      type: object
+      required: [id, employeeName, month, netAmount, status]
+      properties:
+        id: { type: integer }
+        employeeName: { type: string }
+        month: { type: string }
+        grossAmount: { type: ["number", "null"] }
+        netAmount: { type: number }
+        paymentDate: { type: ["string", "null"] }
+        bankReference: { type: ["string", "null"] }
+        status: { type: string }
+
+    GatewaySettlement:
+      type: object
+      required: [id, provider, settlementId, grossAmount, fees, netAmount, settlementDate, status]
+      properties:
+        id: { type: integer }
+        provider: { type: string }
+        settlementId: { type: string }
+        grossAmount: { type: number }
+        fees: { type: number }
+        gstOnFees: { type: ["number", "null"] }
+        netAmount: { type: number }
+        settlementDate: { type: string }
+        bankReference: { type: ["string", "null"] }
+        status: { type: string }
+        bankTransactionId: { type: ["integer", "null"] }
+
+    ReportSummary:
+      type: object
+      required: [companyName, month, verificationScore, caReadyStatus, generatedAt]
+      properties:
+        companyName: { type: string }
+        month: { type: string }
+        verificationScore: { type: integer }
+        caReadyStatus: { type: string }
+        generatedAt: { type: string }
+        totalTransactions: { type: integer }
+        verifiedTransactions: { type: integer }
+        totalInvoices: { type: integer }
+        missingInvoices: { type: integer }
+        totalRisks: { type: integer }
+        highRisks: { type: integer }
+        totalPayroll: { type: number }
+        totalGatewaySettlements: { type: number }
+
+    ExportResult:
+      type: object
+      required: [success, message, rowCount]
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        rowCount: { type: integer }
+        data:
+          type: array
+          items:
+            type: object
+
+    CaReviewItem:
+      type: object
+      required: [id, entityType, title, severity, status, createdAt]
+      properties:
+        id: { type: integer }
+        entityType: { type: string }
+        entityId: { type: ["integer", "null"] }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        severity: { type: string }
+        status: { type: string }
+        founderNote: { type: ["string", "null"] }
+        caNote: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    CaReviewAction:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string }
+        note: { type: ["string", "null"] }

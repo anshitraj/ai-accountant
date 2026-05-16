@@ -1,0 +1,967 @@
+You are a senior full-stack product engineer, UI/UX designer, fintech product architect, and startup brand designer.
+
+Build a complete production-quality prototype web app called:
+
+FinVerify OS
+
+Tagline:
+“Your startup’s finance data, verified before it reaches your CA.”
+
+Core concept:
+FinVerify OS is a finance verification layer for Indian startups, agencies, D2C brands, SaaS companies, creator businesses, and mid-sized SMEs. It connects/uploads bank statements, invoices, Tally/Zoho exports, GST/TDS files, payroll sheets, expenses, and payment gateway settlement files, then tells the founder what is verified, unverified, missing, duplicate, risky, and ready for CA review.
+
+This is NOT generic accounting software.
+This is NOT a CA replacement.
+This is a pre-CA finance verification dashboard.
+
+Primary value proposition:
+“Stop sending messy files to your CA. Verify your bank, invoices, payroll, GST/TDS, expenses, and gateway data before month-end review.”
+
+Build the full app with:
+1. Landing page
+2. Login/signup prototype
+3. Founder dashboard
+4. File upload center
+5. Reconciliation engine
+6. Verified/unverified transaction table
+7. Invoice matching
+8. Ledger matching
+9. GST/TDS risk flags
+10. CA review queue
+11. Reports/export section
+12. Settings/integrations page
+13. Polished YC-style startup landing page with animations
+
+Important:
+Do not build fake direct Tally/GST/bank integrations as if they are live.
+For prototype, use upload-based workflows.
+Show direct integrations as “coming soon” or “connect later”.
+The MVP must work with uploaded CSV/Excel/PDF files and sample/demo data.
+
+Tech stack:
+- React + TypeScript
+- Vite
+- TailwindCSS
+- shadcn/ui style components
+- Framer Motion for animations
+- Lucide React icons
+- Recharts for charts
+- Node.js + Express backend
+- PostgreSQL if available in Replit; otherwise use SQLite or in-memory fallback with clear structure
+- Prisma or Drizzle ORM if setup is stable; otherwise implement clean service files with typed interfaces
+- Use modular folder structure
+- Use clean reusable components
+- Use mock auth if real auth is too slow, but keep architecture ready for real auth
+- Use environment variables for future AI API keys
+
+Brand direction:
+The app should look like a credible YC-style fintech startup, not a crypto app, not a neon dashboard, not a cheap SaaS template.
+
+Brand name:
+FinVerify OS
+
+Wordmark:
+“Fin” in dark slate.
+“Verify” in signal orange.
+Small “OS” pill beside it.
+
+Color palette:
+- Background: #FAFAF7 or #F8FAFC
+- Primary text: #101828
+- Secondary text: #667085
+- Border: #E5E7EB
+- Accent orange: #F26B3A
+- Accent orange dark: #D94A1E
+- Success green: #0F9F6E
+- Warning amber: #D97706
+- Risk red: #DC2626
+- Blue info: #2563EB
+- Dashboard dark text: #111827
+
+Typography:
+Use Inter, Geist, or system sans-serif.
+Landing page should use large clean headings, tight line-height, and startup-grade spacing.
+
+Visual style:
+- Rounded 2xl cards
+- Thin borders
+- Soft shadows
+- Clean charts
+- White/cream background
+- Subtle orange gradient blobs
+- Minimal startup feel
+- Use Lucide icons
+- Use small professional emoji only in labels or empty states, not everywhere
+- Use dashboard mockups instead of random stock photos wherever possible
+- If using images, use royalty-free startup/finance/document/team images from Unsplash or Pexels only
+- Do not use copyrighted logos from Tally, Zoho, Razorpay, GST, YC, or banks
+- Use text integration badges instead of official logos
+
+Suggested professional emoji usage:
+✅ Verified
+⚠️ Risk
+🧾 Missing invoice
+🔍 Needs review
+📤 CA-ready
+🏦 Bank
+📊 GST/TDS
+💼 Payroll
+🔗 Gateway
+Do not overuse emojis. Keep the UI formal.
+
+Landing page structure:
+
+Route: /
+
+Navbar:
+- Logo: FinVerify OS
+- Links: Product, How it works, Demo, Pricing, Security
+- CTA buttons: Login, Start free verification
+
+Hero section:
+Headline:
+“Your startup’s finance data, verified before it reaches your CA.”
+
+Subheadline:
+“Upload bank statements, invoices, Tally or Zoho exports, payroll sheets, GST/TDS files, and payment gateway settlements. FinVerify OS marks what is verified, unverified, missing, risky, and ready for CA review.”
+
+Primary CTA:
+“Start free verification”
+
+Secondary CTA:
+“View product demo”
+
+Hero visual:
+Create a beautiful animated dashboard mockup showing:
+- Finance Verification Score: 82/100
+- Verified amount: ₹18.4L
+- Unverified amount: ₹3.2L
+- Missing invoices: 24
+- GST/TDS risk: 6
+- CA-ready status: Not ready
+- Progress bar
+- Transaction status pills
+
+Hero animation:
+Use Framer Motion:
+- dashboard fades in and floats gently
+- cards stagger in
+- orange glow gradient behind dashboard
+- number counters animate
+
+Trust strip:
+“Built for Indian startups, agencies, D2C brands, SaaS teams, and founder-led companies.”
+
+Problem section:
+Title:
+“Your finance data is scattered before your CA even starts.”
+
+Cards:
+1. Bank statements live separately
+2. Invoices arrive on email and WhatsApp
+3. Tally/Zoho exports are incomplete
+4. GST/TDS files need manual checking
+5. Payroll and expenses are messy
+6. Payment gateway settlements do not match bank credits
+
+How it works:
+Step 1: Upload finance files
+Step 2: System extracts and normalizes data
+Step 3: Matching engine verifies records
+Step 4: Risks and missing documents are flagged
+Step 5: Founder/CA reviews exceptions
+Step 6: Export CA-ready report
+
+Feature section:
+- Bank statement reconciliation
+- Invoice-to-payment matching
+- Tally/Zoho ledger comparison
+- GST/TDS risk flags
+- Payroll and expense verification
+- Payment gateway settlement matching
+- Verified/unverified workflow
+- CA review mode
+- Reports and exports
+
+Dashboard preview section:
+Create realistic UI screenshots with cards/tables:
+- Overview
+- Reconciliation
+- Risk flags
+- CA review queue
+- Report export
+
+Pricing section:
+Use prototype pricing:
+Starter: ₹999/month
+Growth: ₹4,999/month
+CA Firm: ₹14,999/month
+Enterprise: Contact sales
+
+Make it clear these are prototype/example prices.
+
+Security section:
+- Data encryption-ready architecture
+- Role-based access design
+- Audit logs
+- No customer data used for AI training
+- Export/delete company data
+- CA access controls
+
+Footer:
+FinVerify OS
+“Books verified before CA review.”
+Links: Product, Security, Pricing, Contact, Terms, Privacy
+
+Application routes:
+
+/login
+Simple polished login page:
+- Email/password form
+- “Continue demo as Founder”
+- “Continue demo as CA”
+- Background with subtle orange gradient
+- Use mock auth with localStorage/session state
+
+/app
+Redirect to /app/overview
+
+/app/overview
+Founder dashboard with:
+- Finance Verification Score
+- Month-end readiness
+- Total uploaded files
+- Total bank transactions
+- Verified transactions
+- Unverified transactions
+- Missing invoices
+- Risk flags
+- CA-ready status
+- Recent uploads
+- Recent exceptions
+- Charts:
+  - verified vs unverified
+  - risk by category
+  - monthly close progress
+
+Sidebar navigation:
+- Overview
+- Uploads
+- Transactions
+- Invoices
+- Ledger Match
+- GST/TDS Risks
+- Payroll
+- Gateway Settlements
+- Reconciliation
+- CA Review
+- Reports
+- Integrations
+- Settings
+
+Top app navbar:
+- Global search
+- Company switcher
+- Month selector
+- Notification icon
+- User menu
+
+/app/uploads
+Upload center with upload cards:
+1. Bank Statement
+2. Invoice PDFs/Images
+3. Tally Export
+4. Zoho Export
+5. GST 2B/3B File
+6. Payroll Sheet
+7. Payment Gateway Settlement
+8. Expense Sheet
+
+Accepted formats:
+- CSV
+- XLSX
+- PDF
+- PNG/JPG for invoices
+- XML for Tally exports if possible
+
+After upload:
+- Show parsed preview
+- Show detected columns
+- Allow user to map columns manually if parser is unsure
+- Save parsed data to app state/database
+
+Also include “Load sample company data” button.
+Sample company:
+“NovaStack Labs Pvt Ltd”
+Industry: SaaS + agency
+Monthly revenue: ₹42L
+Data should include realistic sample transactions, invoices, payroll, gateway settlements, and risk flags.
+
+Important:
+All demo data must be clearly labelled “Sample Demo Data”.
+
+/app/transactions
+Transaction table:
+Columns:
+- Date
+- Narration
+- Amount
+- Type: Credit/Debit
+- Source: Bank/Gateway/Payroll/Expense
+- Match Status: Verified/Unverified/Missing Invoice/Duplicate/Amount Mismatch/GST Risk/TDS Risk/Needs CA Review
+- Confidence score
+- Matched invoice/ledger
+- Action
+
+Filters:
+- Status
+- Amount range
+- Date range
+- Source
+- Risk level
+- Search narration/vendor/invoice number
+
+Actions:
+- Mark verified
+- Send to CA review
+- Link invoice manually
+- Add note
+- Ignore
+- Export selected
+
+/app/invoices
+Invoice table:
+Columns:
+- Invoice number
+- Vendor/customer
+- GSTIN
+- Date
+- Amount
+- GST amount
+- Payment status
+- Linked bank transaction
+- Risk status
+- Document preview
+
+Features:
+- Search invoices
+- Filter missing payment
+- Filter missing GSTIN
+- Filter duplicate invoice
+- Upload new invoice
+- AI extraction placeholder
+
+/app/ledger-match
+Compare accounting ledger entries from Tally/Zoho export against bank transactions and invoices.
+
+Show:
+- Ledger entries found
+- Bank entries found
+- Matched ledger entries
+- Missing ledger entries
+- Wrong ledger suggestions
+- Duplicate entries
+- Suspense/unmapped entries
+
+Cards:
+- Ledger match score
+- Missing vouchers
+- Possible wrong ledgers
+- Duplicate voucher count
+
+/app/reconciliation
+Main reconciliation engine screen.
+
+Show three columns:
+1. Bank Transactions
+2. Suggested Matches
+3. Invoices/Ledger Entries
+
+Each suggested match should show:
+- Confidence score
+- Matching reason
+- Amount match
+- Date proximity
+- Vendor/name similarity
+- Invoice number/ref match
+- UTR/RRN/ref match
+- Risk notes
+
+Allow:
+- Approve match
+- Reject match
+- Manual match
+- Send to CA review
+- Add comment
+
+Matching statuses:
+- Verified
+- Potential Match
+- Unverified
+- Missing Invoice
+- Missing Bank Entry
+- Amount Mismatch
+- Date Mismatch
+- Duplicate
+- GST Risk
+- TDS Risk
+- Needs CA Review
+
+/app/gst-tds-risks
+Risk dashboard:
+Risk categories:
+- Missing GSTIN
+- GST amount mismatch
+- Invoice missing
+- Vendor payment without invoice
+- Possible TDS deduction
+- High value cash/bank transaction
+- Duplicate invoice number
+- Payment gateway fee mismatch
+- Payroll mismatch
+- Suspense ledger usage
+
+Show severity:
+- Low
+- Medium
+- High
+
+Important:
+Do not give legal/tax advice as final truth.
+Use wording:
+“Potential risk — needs CA review.”
+
+/app/payroll
+Payroll matching:
+- Upload payroll CSV/XLSX
+- Match salary payments with bank debits
+- Flag missing salary payout
+- Flag unmatched salary bank debit
+- Flag amount mismatch
+- Show employees table
+
+/app/gateway-settlements
+Payment gateway matching:
+Support prototype imports for:
+- Razorpay-style settlement CSV
+- Cashfree-style settlement CSV
+- Stripe-style balance transaction CSV
+
+Show:
+- Gross amount
+- Fees
+- GST on fees
+- Net settlement
+- Bank credit matched
+- Settlement delay
+- Refunds/chargebacks placeholder
+
+/app/ca-review
+CA review queue:
+- Items needing review
+- Risk flags
+- Comments thread
+- Suggested correction
+- Founder note
+- CA action:
+  - Approve
+  - Reject
+  - Request document
+  - Mark resolved
+  - Export correction sheet
+
+Role mode:
+If user logs in as CA, show CA-first view:
+- Client list
+- Pending review items
+- High-risk clients
+- Monthly close status
+- Workload summary
+
+/app/reports
+Generate reports:
+1. CA-ready Excel report
+2. Founder summary PDF
+3. Missing documents report
+4. Risk flags report
+5. Verified/unverified transaction export
+6. Ledger correction suggestion sheet
+7. Monthly close summary
+
+In prototype:
+- Generate downloadable CSV/XLSX where possible
+- Generate printable HTML/PDF-style report page
+- Include company name, month, score, summary, tables
+
+/app/integrations
+Show integration cards:
+Available now:
+- CSV upload
+- Excel upload
+- PDF invoice upload
+- Tally export upload
+- Zoho export upload
+
+Coming soon:
+- Direct Tally connector
+- Zoho Books API
+- Razorpay API
+- Cashfree API
+- GST/GSP integration
+- Account Aggregator bank feed
+- Gmail invoice import
+- WhatsApp document collection
+
+Each card should say:
+- Status
+- What data it connects
+- Setup complexity
+- Whether it is live or roadmap
+
+/app/settings
+Settings:
+- Company profile
+- CA email
+- Financial year/month
+- Currency INR
+- Data retention controls
+- Team members
+- Role permissions
+- Export/delete data
+- AI settings placeholder
+
+Backend requirements:
+
+Create clean API routes:
+GET /api/health
+GET /api/demo/seed
+POST /api/uploads
+GET /api/uploads
+GET /api/transactions
+POST /api/transactions/:id/status
+GET /api/invoices
+GET /api/reconciliation/run
+POST /api/reconciliation/approve
+POST /api/reconciliation/reject
+GET /api/risks
+GET /api/reports/summary
+GET /api/reports/export-csv
+POST /api/ai/extract-invoice
+POST /api/ai/explain-risk
+POST /api/ai/month-end-summary
+
+If AI API key is missing:
+- app should still work with rule-based extraction/matching
+- show “AI disabled — using rule-based mode”
+- do not crash
+
+AI architecture:
+Use AI only for:
+- invoice field extraction
+- bank narration interpretation
+- ledger suggestion
+- risk explanation
+- founder-friendly month-end summary
+
+Do not use AI as the source of financial truth.
+Rules-first, AI-assisted.
+
+Matching engine logic:
+
+Create a service:
+server/services/matchingEngine.ts
+
+Implement:
+1. Normalize names:
+- lowercase
+- remove punctuation
+- remove Pvt Ltd, Private Limited, Ltd, LLP, Inc, Technologies, Solutions, Enterprises etc.
+- trim spaces
+
+2. Extract references from bank narration:
+- UTR
+- RRN
+- invoice number patterns
+- NEFT/RTGS/IMPS/UPI refs
+- gateway settlement IDs
+
+3. Matching rules:
+Exact match:
+- same amount
+- same invoice number/ref/UTR/RRN OR high vendor similarity
+- date within 0-3 days
+
+Potential match:
+- same amount
+- vendor similarity > 0.65
+- date within 7 days
+
+Partial payment:
+- bank amount less than invoice amount
+- same vendor
+- date within 15 days
+
+Split payment:
+- multiple bank entries sum to one invoice amount
+- same vendor
+- date within 15 days
+
+Gateway settlement:
+- settlement net amount equals bank credit
+- allow fee/GST deductions
+- date within 3 days
+
+Payroll match:
+- bank narration includes salary/payroll/employee name
+- amount equals payroll net salary
+- date within payroll window
+
+Duplicate:
+- same invoice number + same vendor + same amount
+- same bank amount/date/narration repeated
+
+Risk:
+- no invoice for debit payment
+- invoice GSTIN missing
+- GST amount mismatch
+- high value transaction missing document
+- possible TDS category with no TDS note
+- ledger marked suspense/unmapped
+- low confidence match
+
+Confidence score:
+0-100
+Calculate based on:
+- amount match: 35 points
+- date closeness: 15 points
+- vendor/name similarity: 20 points
+- reference/invoice/UTR match: 20 points
+- source consistency: 10 points
+
+Status thresholds:
+- 85+ = Verified
+- 60-84 = Potential Match / Needs Review
+- below 60 = Unverified
+- missing required document = Missing Invoice
+- tax/compliance heuristic = Risk
+
+Data model:
+
+User:
+- id
+- name
+- email
+- role: founder/admin/ca
+- companyId
+
+Company:
+- id
+- name
+- type
+- industry
+- monthlyRevenueRange
+- caEmail
+- createdAt
+
+UploadBatch:
+- id
+- companyId
+- sourceType
+- fileName
+- status
+- uploadedAt
+
+BankTransaction:
+- id
+- companyId
+- date
+- narration
+- amount
+- type credit/debit
+- bankName
+- reference
+- sourceFileId
+- status
+- confidenceScore
+
+Invoice:
+- id
+- companyId
+- invoiceNumber
+- vendorName
+- customerName
+- gstin
+- date
+- amount
+- gstAmount
+- type purchase/sales
+- fileUrl
+- status
+
+LedgerEntry:
+- id
+- companyId
+- date
+- ledgerName
+- voucherNumber
+- amount
+- debitCredit
+- sourceTool: tally/zoho/manual
+- status
+
+PayrollEntry:
+- id
+- companyId
+- employeeName
+- month
+- netAmount
+- paymentDate
+- status
+
+GatewaySettlement:
+- id
+- companyId
+- provider
+- settlementId
+- grossAmount
+- fees
+- gstOnFees
+- netAmount
+- settlementDate
+- bankReference
+- status
+
+ReconciliationMatch:
+- id
+- companyId
+- bankTransactionId
+- invoiceId
+- ledgerEntryId
+- matchType
+- confidenceScore
+- reason
+- status
+- createdAt
+
+RiskFlag:
+- id
+- companyId
+- entityType
+- entityId
+- category
+- severity
+- reason
+- suggestedAction
+- status
+
+Report:
+- id
+- companyId
+- month
+- score
+- generatedAt
+- summaryJson
+
+Frontend components:
+
+components/landing/
+- LandingNavbar
+- HeroSection
+- DashboardMockup
+- ProblemSection
+- WorkflowSection
+- FeatureGrid
+- DemoPreview
+- PricingSection
+- SecuritySection
+- Footer
+
+components/app/
+- AppShell
+- Sidebar
+- Topbar
+- StatCard
+- ScoreCard
+- StatusBadge
+- RiskBadge
+- UploadCard
+- DataTable
+- FilterBar
+- EmptyState
+- ReportCard
+- IntegrationCard
+- ReviewQueue
+- MatchConfidenceBar
+
+components/charts/
+- VerificationPieChart
+- RiskBarChart
+- MonthEndProgressChart
+- SourceBreakdownChart
+
+Landing page copy:
+
+Hero headline:
+“Your startup’s finance data, verified before it reaches your CA.”
+
+Subheadline:
+“FinVerify OS checks bank statements, invoices, Tally/Zoho exports, payroll, GST/TDS files, expenses, and gateway settlements — then shows what is verified, unverified, missing, risky, and CA-ready.”
+
+Problem headline:
+“Founders don’t have an accounting problem. They have a scattered finance data problem.”
+
+Problem body:
+“Before your CA can review anything, someone has to match bank entries, invoices, ledgers, payroll, GST/TDS files, and gateway settlements. That work still happens across Excel sheets, emails, exports, and screenshots.”
+
+Feature headline:
+“One dashboard before month-end chaos starts.”
+
+How it works headline:
+“Upload. Match. Verify. Review. Export.”
+
+Reports headline:
+“Send your CA a clean review file, not a messy folder.”
+
+Security headline:
+“Built for sensitive finance data from day one.”
+
+CTA:
+“Start your first finance verification”
+
+Tone:
+Professional, crisp, Indian startup-focused.
+Avoid hype like “AI will replace CAs”.
+Use “AI-assisted” only where useful.
+Use “potential risk” instead of absolute legal/tax claims.
+
+Seed sample data:
+
+Create sample transactions for NovaStack Labs Pvt Ltd:
+- 60 bank transactions
+- 30 invoices
+- 20 ledger entries
+- 10 payroll entries
+- 12 gateway settlement entries
+- 15 risk flags
+- 25 reconciliation matches
+
+Make data realistic:
+- Indian vendor names
+- UPI/NEFT/IMPS/RTGS narrations
+- invoice numbers like INV-2026-001
+- GSTIN-like placeholders
+- amounts from ₹1,000 to ₹8,00,000
+- dates across current month
+- categories: software, contractor, rent, marketing, salary, SaaS tools, payment gateway settlement, client payment
+
+Important:
+Mark sample data clearly as demo data.
+Do not use real company private data.
+
+UX requirements:
+- App must be responsive
+- Sidebar collapses on mobile
+- Tables should scroll horizontally on mobile
+- Use skeleton loaders
+- Use toast notifications
+- Use empty states
+- Use search and filters
+- Use status badges with colors
+- Use smooth page transitions
+- Use Framer Motion carefully, not too much
+
+Animations:
+Landing page:
+- Hero dashboard float
+- Cards fade/stagger
+- Progress bars animate
+- Verification score count-up
+- Subtle gradient movement
+- Smooth hover effects
+
+App:
+- Cards animate in lightly
+- Upload cards hover
+- Status changes animate
+- Tables should remain fast and readable
+
+Search:
+Global search should search:
+- transaction narration
+- invoice number
+- vendor name
+- ledger name
+- risk category
+- report name
+
+Reports/export:
+Implement CSV export for:
+- transactions
+- risk flags
+- reconciliation matches
+- missing invoices
+- CA-ready report
+
+For PDF:
+If PDF library setup is complicated, create a print-friendly report page with window.print().
+
+Quality rules:
+- No broken pages
+- No placeholder lorem ipsum
+- No fake “connected to Tally/GST/bank” claims
+- No copied brand logos
+- No overuse of emojis
+- No crypto-style visuals
+- No neon gradients
+- No cluttered UI
+- No dashboards with meaningless metrics
+- Every metric should come from sample or uploaded data
+- Code should be clean and modular
+
+Build order:
+1. Set up React + Tailwind + routing
+2. Build landing page
+3. Build app shell/sidebar/topbar
+4. Add mock auth
+5. Add sample data store
+6. Add upload UI
+7. Add parsing utilities for CSV/XLSX
+8. Add matching engine
+9. Add dashboard cards/charts
+10. Add reconciliation table
+11. Add risk flags
+12. Add CA review queue
+13. Add reports/export
+14. Polish UI/animations
+15. Ensure app runs without errors
+
+Final deliverables:
+- Complete working app
+- Landing page
+- Dashboard
+- Upload-based workflow
+- Matching engine
+- Reports
+- Demo data
+- Responsive design
+- Clear README with:
+  - What this prototype does
+  - What is real
+  - What is mocked
+  - How to run
+  - Future integrations
+  - Environment variables
+  - Known limitations
+
+README must mention:
+Current prototype supports file uploads and demo data.
+Direct Tally/GST/bank integrations are future work.
+AI API is optional and app works in rule-based mode if no key is provided.
+
+After building, run:
+npm install
+npm run dev
+npm run build
+
+Fix all errors before final response.
+Show changed files and how to run the app.
