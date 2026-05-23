@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { bankTransactionsTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, like, or } from "drizzle-orm";
+import { auditAction, getCompanyId, requirePermission } from "../middleware/authz";
 import {
   GetTransactionsResponse,
   GetTransactionsQueryParams,
@@ -12,11 +13,12 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/transactions", async (req, res): Promise<void> => {
+router.get("/transactions", requirePermission("transactions.read"), async (req, res): Promise<void> => {
   const qp = GetTransactionsQueryParams.safeParse(req.query);
   const params = qp.success ? qp.data : {};
+  const companyId = getCompanyId(req);
 
-  let txns = await db.select().from(bankTransactionsTable).orderBy(desc(bankTransactionsTable.date));
+  let txns = await db.select().from(bankTransactionsTable).where(eq(bankTransactionsTable.companyId, companyId)).orderBy(desc(bankTransactionsTable.date));
 
   if (params.status) {
     txns = txns.filter(t => t.status === params.status);
@@ -56,7 +58,7 @@ router.get("/transactions", async (req, res): Promise<void> => {
   ));
 });
 
-router.patch("/transactions/:id/status", async (req, res): Promise<void> => {
+router.patch("/transactions/:id/status", requirePermission("transactions.update_status"), async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
   if (isNaN(id)) {
@@ -72,13 +74,18 @@ router.patch("/transactions/:id/status", async (req, res): Promise<void> => {
 
   const [txn] = await db.update(bankTransactionsTable)
     .set({ status: parsed.data.status, note: parsed.data.note ?? null })
-    .where(eq(bankTransactionsTable.id, id))
+    .where(and(eq(bankTransactionsTable.id, id), eq(bankTransactionsTable.companyId, getCompanyId(req))))
     .returning();
 
   if (!txn) {
     res.status(404).json({ error: "Transaction not found" });
     return;
   }
+
+  await auditAction(req, "transaction.status_updated", "transaction", txn.id, {
+    status: txn.status,
+    note: txn.note,
+  });
 
   res.json(UpdateTransactionStatusResponse.parse({
     id: txn.id,

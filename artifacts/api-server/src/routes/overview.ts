@@ -6,16 +6,19 @@ import {
   uploadBatchesTable,
   riskFlagsTable,
 } from "@workspace/db";
-import { sql, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { GetOverviewResponse } from "@workspace/api-zod";
+import { getCompanyId, requirePermission } from "../middleware/authz";
 
 const router: IRouter = Router();
 
-router.get("/overview", async (req, res): Promise<void> => {
-  const txns = await db.select().from(bankTransactionsTable);
-  const invoices = await db.select().from(invoicesTable);
-  const uploads = await db.select().from(uploadBatchesTable).orderBy(uploadBatchesTable.uploadedAt).limit(5);
-  const risks = await db.select().from(riskFlagsTable).where(eq(riskFlagsTable.status, "open"));
+router.get("/overview", requirePermission("overview.read"), async (req, res): Promise<void> => {
+  const companyId = getCompanyId(req);
+  const txns = await db.select().from(bankTransactionsTable).where(eq(bankTransactionsTable.companyId, companyId));
+  const invoices = await db.select().from(invoicesTable).where(eq(invoicesTable.companyId, companyId));
+  const uploads = await db.select().from(uploadBatchesTable).where(eq(uploadBatchesTable.companyId, companyId)).orderBy(uploadBatchesTable.uploadedAt).limit(5);
+  const risks = await db.select().from(riskFlagsTable).where(eq(riskFlagsTable.companyId, companyId));
+  const openRisks = risks.filter(r => r.status === "open");
 
   const verified = txns.filter(t => t.status === "verified").length;
   const unverified = txns.filter(t => !["verified", "missing_invoice"].includes(t.status)).length;
@@ -36,7 +39,7 @@ router.get("/overview", async (req, res): Promise<void> => {
   const caReady = score >= 85 ? "Ready for CA" : score >= 60 ? "Needs Review" : "Not Ready";
 
   const riskByCategory: Record<string, { count: number; severity: string }> = {};
-  for (const r of risks) {
+  for (const r of openRisks) {
     if (!riskByCategory[r.category]) {
       riskByCategory[r.category] = { count: 0, severity: r.severity };
     }
@@ -67,8 +70,8 @@ router.get("/overview", async (req, res): Promise<void> => {
     verifiedTransactions: verified,
     unverifiedTransactions: unverified,
     missingInvoices: missingInvoice + invoices.filter(i => i.status === "unverified").length,
-    riskFlags: risks.length,
-    totalUploads: await db.select({ count: sql<number>`count(*)` }).from(uploadBatchesTable).then(r => Number(r[0].count)),
+    riskFlags: openRisks.length,
+    totalUploads: await db.select().from(uploadBatchesTable).where(eq(uploadBatchesTable.companyId, companyId)).then(r => r.length),
     caReadyStatus: caReady,
     verifiedAmount,
     unverifiedAmount,

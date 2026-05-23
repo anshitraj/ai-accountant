@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { invoicesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { GetInvoicesResponse, CreateInvoiceBody } from "@workspace/api-zod";
+import { auditAction, getCompanyId, requirePermission } from "../middleware/authz";
 
 const router: IRouter = Router();
 
@@ -21,8 +22,8 @@ const mapInvoice = (inv: typeof invoicesTable.$inferSelect) => ({
   linkedTransactionId: inv.linkedTransactionId ?? null,
 });
 
-router.get("/invoices", async (req, res): Promise<void> => {
-  let invs = await db.select().from(invoicesTable).orderBy(desc(invoicesTable.date));
+router.get("/invoices", requirePermission("invoices.read"), async (req, res): Promise<void> => {
+  let invs = await db.select().from(invoicesTable).where(eq(invoicesTable.companyId, getCompanyId(req))).orderBy(desc(invoicesTable.date));
 
   const { status, search } = req.query as { status?: string; search?: string };
 
@@ -41,7 +42,7 @@ router.get("/invoices", async (req, res): Promise<void> => {
   res.json(GetInvoicesResponse.parse(invs.map(mapInvoice)));
 });
 
-router.post("/invoices", async (req, res): Promise<void> => {
+router.post("/invoices", requirePermission("invoices.create"), async (req, res): Promise<void> => {
   const parsed = CreateInvoiceBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -49,6 +50,7 @@ router.post("/invoices", async (req, res): Promise<void> => {
   }
 
   const [inv] = await db.insert(invoicesTable).values({
+    companyId: getCompanyId(req),
     invoiceNumber: parsed.data.invoiceNumber,
     vendorName: parsed.data.vendorName,
     customerName: parsed.data.customerName ?? null,
@@ -58,6 +60,8 @@ router.post("/invoices", async (req, res): Promise<void> => {
     gstAmount: parsed.data.gstAmount?.toString() ?? null,
     type: parsed.data.type,
   }).returning();
+
+  await auditAction(req, "invoice.created", "invoice", inv.id, { invoiceNumber: inv.invoiceNumber });
 
   res.status(201).json(mapInvoice(inv));
 });

@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { CheckCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { login } from "@/lib/auth";
 
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 const DEMO_ACCOUNTS = [
   {
     email: "rahul@novastack.in",
@@ -32,19 +34,41 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const persistLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
+    try {
+      const res = await fetch(`${BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: account.email, password: account.password }),
+      });
+      if (!res.ok) throw new Error("Database-backed demo login failed");
+      const data = await res.json();
+      login({
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        role: data.user.role,
+        company: data.user.company,
+        companyId: data.user.companyId,
+      });
+    } catch {
+      login({ email: account.email, name: account.name, role: account.role, company: account.company });
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const account = DEMO_ACCOUNTS.find(a => a.email === email && a.password === password);
     if (!account) {
       setError("Invalid credentials. Use a demo account below.");
       return;
     }
-    login({ email: account.email, name: account.name, role: account.role, company: account.company });
+    await persistLogin(account);
     navigate("/app/overview");
   };
 
-  const quickLogin = (account: typeof DEMO_ACCOUNTS[0]) => {
-    login({ email: account.email, name: account.name, role: account.role, company: account.company });
+  const quickLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
+    await persistLogin(account);
     navigate("/app/overview");
   };
 

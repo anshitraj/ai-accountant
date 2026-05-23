@@ -1,13 +1,67 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Building2, Bell, Shield, Users, Save } from "lucide-react";
+import { Building2, Bell, Shield, Users, Save, Database, FileText, History } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
 import { useToast } from "@/hooks/use-toast";
 import { getUser } from "@/lib/auth";
 
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+interface PlatformUser {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+}
+
+interface AuditLog {
+  id: number;
+  actorEmail?: string | null;
+  action: string;
+  entityType: string;
+  createdAt: string;
+}
+
+interface DocumentRecord {
+  id: number;
+  fileName: string;
+  sourceType: string;
+  storageProvider: string;
+  status: string;
+  extractedTextStatus: string;
+}
+
+interface SecurityPosture {
+  roleBasedAccessDesign: boolean;
+  activeUsers: number;
+  auditLogsEnabled: boolean;
+  fileStorageMode: string;
+  aiMode: string;
+  directIntegrationsLive: boolean;
+  notes: string[];
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const user = getUser();
+  const { data: team = [] } = useQuery<PlatformUser[]>({
+    queryKey: ["platformUsers"],
+    queryFn: () => fetch(`${BASE}/api/users`).then(r => r.json()),
+  });
+  const { data: auditLogs = [] } = useQuery<AuditLog[]>({
+    queryKey: ["auditLogs"],
+    queryFn: () => fetch(`${BASE}/api/audit-logs?limit=5`).then(r => r.json()),
+  });
+  const { data: documents = [] } = useQuery<DocumentRecord[]>({
+    queryKey: ["documents"],
+    queryFn: () => fetch(`${BASE}/api/documents`).then(r => r.json()),
+  });
+  const { data: security } = useQuery<SecurityPosture>({
+    queryKey: ["securityPosture"],
+    queryFn: () => fetch(`${BASE}/api/security/posture`).then(r => r.json()),
+  });
 
   const [company, setCompany] = useState({
     name: "NovaStack Labs Pvt Ltd",
@@ -82,6 +136,31 @@ export default function SettingsPage() {
       ),
     },
     {
+      id: "team",
+      icon: Users,
+      label: "Team Members & Role Permissions",
+      content: (
+        <div className="space-y-3">
+          {(team.length ? team : [
+            { id: 1, name: "Rahul Mehta", email: "rahul@novastack.in", role: "founder", status: "active" },
+            { id: 2, name: "CA Priya Sharma", email: "ca@finverify.in", role: "ca", status: "active" },
+          ]).map(member => (
+            <div key={member.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+              <div>
+                <div className="text-sm font-medium">{member.name}</div>
+                <div className="text-xs text-muted-foreground">{member.email}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-semibold capitalize">{member.role}</div>
+                <div className="text-[11px] text-success capitalize">{member.status}</div>
+              </div>
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground">Role model is persisted for platform design; demo auth is still localStorage-based.</p>
+        </div>
+      ),
+    },
+    {
       id: "notifications",
       icon: Bell,
       label: "Notification Preferences",
@@ -147,6 +226,73 @@ export default function SettingsPage() {
               Request data export
             </button>
           </div>
+          <div className="grid md:grid-cols-2 gap-3 pt-2">
+            {[
+              { label: "RBAC design", value: security?.roleBasedAccessDesign ? "Enabled" : "Designed" },
+              { label: "Audit logs", value: security?.auditLogsEnabled ? "Enabled" : "Designed" },
+              { label: "File storage", value: security?.fileStorageMode === "metadata_only" ? "Metadata only" : "Configured" },
+              { label: "AI mode", value: security?.aiMode ?? "rule-based" },
+            ].map(item => (
+              <div key={item.label} className="p-3 rounded-lg border border-border bg-background">
+                <div className="text-xs text-muted-foreground">{item.label}</div>
+                <div className="text-sm font-semibold">{item.value}</div>
+              </div>
+            ))}
+          </div>
+          {security?.notes?.map(note => (
+            <p key={note} className="text-xs text-muted-foreground">{note}</p>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "data",
+      icon: Database,
+      label: "Data Store & Documents",
+      content: (
+        <div className="space-y-4">
+          <div className="grid md:grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg border border-border bg-background">
+              <div className="text-xs text-muted-foreground">Documents</div>
+              <div className="text-xl font-bold">{documents.length}</div>
+            </div>
+            <div className="p-3 rounded-lg border border-border bg-background">
+              <div className="text-xs text-muted-foreground">Storage mode</div>
+              <div className="text-sm font-semibold">Metadata only</div>
+            </div>
+            <div className="p-3 rounded-lg border border-border bg-background">
+              <div className="text-xs text-muted-foreground">Retention</div>
+              <div className="text-sm font-semibold">365 days</div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {(documents.length ? documents.slice(0, 5) : []).map(document => (
+              <div key={document.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
+                <span className="flex items-center gap-2"><FileText className="w-3.5 h-3.5 text-primary" />{document.fileName}</span>
+                <span className="text-xs text-muted-foreground">{document.sourceType} / {document.status}</span>
+              </div>
+            ))}
+            {documents.length === 0 && <p className="text-xs text-muted-foreground">Seed demo data or upload a file to create document metadata records.</p>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "audit",
+      icon: History,
+      label: "Audit Logs",
+      content: (
+        <div className="space-y-2">
+          {(auditLogs.length ? auditLogs : []).map(log => (
+            <div key={log.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+              <div>
+                <div className="text-sm font-medium">{log.action}</div>
+                <div className="text-xs text-muted-foreground">{log.actorEmail ?? "system"} / {log.entityType}</div>
+              </div>
+              <div className="text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString("en-IN")}</div>
+            </div>
+          ))}
+          {auditLogs.length === 0 && <p className="text-xs text-muted-foreground">Audit logging is implemented. Seed demo data or upload files to see events.</p>}
         </div>
       ),
     },

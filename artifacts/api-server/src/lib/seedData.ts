@@ -1,7 +1,11 @@
 import { db } from "@workspace/db";
 import {
+  auditLogsTable,
   uploadBatchesTable,
   bankTransactionsTable,
+  companiesTable,
+  documentsTable,
+  gstRecordsTable,
   invoicesTable,
   ledgerEntriesTable,
   payrollEntriesTable,
@@ -9,10 +13,18 @@ import {
   reconciliationMatchesTable,
   riskFlagsTable,
   caReviewItemsTable,
+  rolePermissionsTable,
+  usersTable,
 } from "@workspace/db";
 
 export async function seedDemoData() {
   // Clear existing demo data
+  await db.delete(auditLogsTable);
+  await db.delete(gstRecordsTable);
+  await db.delete(documentsTable);
+  await db.delete(rolePermissionsTable);
+  await db.delete(usersTable);
+  await db.delete(companiesTable);
   await db.delete(caReviewItemsTable);
   await db.delete(reconciliationMatchesTable);
   await db.delete(riskFlagsTable);
@@ -23,15 +35,118 @@ export async function seedDemoData() {
   await db.delete(bankTransactionsTable);
   await db.delete(uploadBatchesTable);
 
+  const [company] = await db.insert(companiesTable).values({
+    name: "NovaStack Labs Pvt Ltd",
+    industry: "SaaS + marketing agency",
+    monthlyRevenueRange: "₹42L",
+    caEmail: "ca@finverify.in",
+    gstin: "29AAHCN0094Q1ZF",
+    pan: "AAHCN0094Q",
+    financialYearStart: "April",
+    currency: "INR",
+    dataRetentionDays: 365,
+  }).returning();
+
+  const users = await db.insert(usersTable).values([
+    {
+      companyId: company.id,
+      name: "Rahul Mehta",
+      email: "rahul@novastack.in",
+      role: "founder",
+      status: "active",
+    },
+    {
+      companyId: company.id,
+      name: "CA Priya Sharma",
+      email: "ca@finverify.in",
+      role: "ca",
+      status: "active",
+    },
+    {
+      companyId: company.id,
+      name: "Ananya Rao",
+      email: "finance@novastack.in",
+      role: "admin",
+      status: "active",
+    },
+  ]).returning();
+
+  await db.insert(rolePermissionsTable).values([
+    { companyId: company.id, role: "founder", permission: "overview.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "transactions.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "invoices.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "ledger.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "risks.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "payroll.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "gateway.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "reports.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "reconciliation.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "reconciliation.run", enabled: true },
+    { companyId: company.id, role: "founder", permission: "reconciliation.approve", enabled: true },
+    { companyId: company.id, role: "founder", permission: "reconciliation.reject", enabled: true },
+    { companyId: company.id, role: "founder", permission: "uploads.read", enabled: true },
+    { companyId: company.id, role: "founder", permission: "uploads.create", enabled: true },
+    { companyId: company.id, role: "founder", permission: "reports.export", enabled: true },
+    { companyId: company.id, role: "founder", permission: "settings.manage_company", enabled: true },
+    { companyId: company.id, role: "admin", permission: "overview.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "transactions.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "invoices.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "ledger.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "risks.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "payroll.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "gateway.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "reports.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "reconciliation.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "uploads.read", enabled: true },
+    { companyId: company.id, role: "admin", permission: "uploads.create", enabled: true },
+    { companyId: company.id, role: "admin", permission: "invoices.create", enabled: true },
+    { companyId: company.id, role: "admin", permission: "transactions.update_status", enabled: true },
+    { companyId: company.id, role: "admin", permission: "reconciliation.run", enabled: true },
+    { companyId: company.id, role: "admin", permission: "reconciliation.approve", enabled: true },
+    { companyId: company.id, role: "admin", permission: "reconciliation.reject", enabled: true },
+    { companyId: company.id, role: "ca", permission: "overview.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "transactions.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "invoices.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "ledger.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "risks.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "payroll.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "gateway.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "reports.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "reconciliation.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "reconciliation.approve", enabled: true },
+    { companyId: company.id, role: "ca", permission: "reconciliation.reject", enabled: true },
+    { companyId: company.id, role: "ca", permission: "uploads.read", enabled: true },
+    { companyId: company.id, role: "ca", permission: "ca_review.process", enabled: true },
+    { companyId: company.id, role: "ca", permission: "risks.resolve", enabled: true },
+    { companyId: company.id, role: "ca", permission: "settings.manage_company", enabled: false },
+  ]);
+
   // Upload batches
   const uploads = await db.insert(uploadBatchesTable).values([
-    { sourceType: "bank_statement", fileName: "HDFC_May2026.csv", status: "processed", recordCount: 60 },
-    { sourceType: "invoice", fileName: "Invoices_May2026.pdf", status: "processed", recordCount: 30 },
-    { sourceType: "tally_export", fileName: "Tally_Ledger_May2026.xml", status: "processed", recordCount: 20 },
-    { sourceType: "payroll", fileName: "Payroll_May2026.xlsx", status: "processed", recordCount: 10 },
-    { sourceType: "gateway_settlement", fileName: "Razorpay_Settlements_May2026.csv", status: "processed", recordCount: 12 },
-    { sourceType: "gst_file", fileName: "GSTR2B_May2026.json", status: "partial", recordCount: 15 },
+    { companyId: company.id, sourceType: "bank", fileName: "HDFC_May2026.csv", status: "processed", recordCount: 60 },
+    { companyId: company.id, sourceType: "invoices", fileName: "Invoices_May2026.pdf", status: "processed", recordCount: 30 },
+    { companyId: company.id, sourceType: "tally", fileName: "Tally_Ledger_May2026.xml", status: "processed", recordCount: 20 },
+    { companyId: company.id, sourceType: "payroll", fileName: "Payroll_May2026.xlsx", status: "processed", recordCount: 10 },
+    { companyId: company.id, sourceType: "gateway", fileName: "Razorpay_Settlements_May2026.csv", status: "processed", recordCount: 12 },
+    { companyId: company.id, sourceType: "gst", fileName: "GSTR2B_May2026.json", status: "partial", recordCount: 15 },
   ]).returning();
+
+  await db.insert(documentsTable).values(uploads.map(upload => ({
+    companyId: company.id,
+    uploadBatchId: upload.id,
+    fileName: upload.fileName,
+    sourceType: upload.sourceType,
+    storageProvider: "metadata_only",
+    status: "metadata_captured",
+    extractedTextStatus: upload.sourceType === "invoices" ? "placeholder" : "not_required",
+    rowCount: upload.recordCount ?? null,
+    detectedColumns: upload.sourceType === "bank"
+      ? ["date", "narration", "amount", "type", "reference"]
+      : upload.sourceType === "gateway"
+      ? ["settlement_id", "gross_amount", "fees", "gst_on_fees", "net_amount"]
+      : [],
+    uploadedByUserId: users[2].id,
+  })));
 
   // Bank Transactions (60 entries)
   const txns = await db.insert(bankTransactionsTable).values([
@@ -247,12 +362,115 @@ export async function seedDemoData() {
     { entityType: "ledger", title: "Suspense account usage for ATM withdrawal", description: "₹20,000 ATM withdrawal mapped to Suspense account. Needs proper ledger assignment.", severity: "low", status: "pending" },
   ]);
 
+  const gstRecords = await db.insert(gstRecordsTable).values([
+    {
+      companyId: company.id,
+      period: "May 2026",
+      sourceType: "gstr2b",
+      gstin: "27AAECZ1234F1Z5",
+      counterpartyName: "Zomato Media Ltd",
+      invoiceNumber: "INV-2026-001",
+      invoiceDate: "2026-04-30",
+      taxableValue: "241525.42",
+      gstAmount: "43474.58",
+      matchStatus: "matched",
+      riskStatus: "none",
+    },
+    {
+      companyId: company.id,
+      period: "May 2026",
+      sourceType: "gstr2b",
+      gstin: null,
+      counterpartyName: "Amazon Web Services",
+      invoiceNumber: "INV-AWS-2026-045",
+      invoiceDate: "2026-05-02",
+      taxableValue: "156200.00",
+      gstAmount: "0.00",
+      matchStatus: "unmatched",
+      riskStatus: "missing_gstin",
+    },
+    {
+      companyId: company.id,
+      period: "May 2026",
+      sourceType: "gstr2b",
+      gstin: "29AABCS1234A1Z9",
+      counterpartyName: "Salesforce India",
+      invoiceNumber: "INV-SF-2026-201",
+      invoiceDate: "2026-05-19",
+      taxableValue: "105932.20",
+      gstAmount: "19067.80",
+      matchStatus: "matched",
+      riskStatus: "none",
+    },
+    {
+      companyId: company.id,
+      period: "May 2026",
+      sourceType: "tds",
+      gstin: null,
+      counterpartyName: "Freelance UI Designer",
+      invoiceNumber: null,
+      invoiceDate: "2026-05-19",
+      taxableValue: "45000.00",
+      gstAmount: "0.00",
+      matchStatus: "missing_invoice",
+      riskStatus: "tds_review",
+    },
+  ]).returning();
+
+  await db.insert(auditLogsTable).values([
+    {
+      companyId: company.id,
+      userId: users[2].id,
+      actorEmail: users[2].email,
+      action: "demo.seeded",
+      entityType: "company",
+      entityId: company.id,
+      metadata: { note: "Sample Demo Data seeded for NovaStack Labs Pvt Ltd" },
+    },
+    {
+      companyId: company.id,
+      userId: users[0].id,
+      actorEmail: users[0].email,
+      action: "reconciliation.run",
+      entityType: "reconciliation",
+      metadata: { matchesCreated: 25, mode: "rule_based" },
+    },
+    {
+      companyId: company.id,
+      userId: users[1].id,
+      actorEmail: users[1].email,
+      action: "ca_review.queue_created",
+      entityType: "ca_review",
+      metadata: { pendingItems: 10, wording: "Potential risk - needs CA review" },
+    },
+    {
+      companyId: company.id,
+      userId: users[2].id,
+      actorEmail: users[2].email,
+      action: "documents.metadata_captured",
+      entityType: "document",
+      metadata: { documentCount: uploads.length, storageProvider: "metadata_only" },
+    },
+  ]);
+
+  await db.update(bankTransactionsTable).set({ companyId: company.id });
+  await db.update(invoicesTable).set({ companyId: company.id });
+  await db.update(ledgerEntriesTable).set({ companyId: company.id });
+  await db.update(payrollEntriesTable).set({ companyId: company.id });
+  await db.update(gatewaySettlementsTable).set({ companyId: company.id });
+  await db.update(reconciliationMatchesTable).set({ companyId: company.id });
+  await db.update(riskFlagsTable).set({ companyId: company.id });
+  await db.update(caReviewItemsTable).set({ companyId: company.id });
+
   return {
+    companies: 1,
+    users: users.length,
     transactions: txns.length,
     invoices: invoices.length,
     ledgerEntries: ledger.length,
     payrollEntries: payroll.length,
     gatewaySettlements: settlements.length,
+    gstRecords: gstRecords.length,
     uploads: uploads.length,
   };
 }

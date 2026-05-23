@@ -1,13 +1,14 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { gatewaySettlementsTable } from "@workspace/db";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { GetGatewaySettlementsResponse } from "@workspace/api-zod";
+import { getCompanyId, requirePermission } from "../middleware/authz";
 
 const router: IRouter = Router();
 
-router.get("/gateway-settlements", async (req, res): Promise<void> => {
-  const settlements = await db.select().from(gatewaySettlementsTable).orderBy(desc(gatewaySettlementsTable.settlementDate));
+router.get("/gateway-settlements", requirePermission("gateway.read"), async (req, res): Promise<void> => {
+  const settlements = await db.select().from(gatewaySettlementsTable).where(eq(gatewaySettlementsTable.companyId, getCompanyId(req))).orderBy(desc(gatewaySettlementsTable.settlementDate));
   res.json(GetGatewaySettlementsResponse.parse(
     settlements.map(s => ({
       id: s.id,

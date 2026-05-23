@@ -1,18 +1,22 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import {
   reconciliationMatchesTable,
   bankTransactionsTable,
   invoicesTable,
-  riskFlagsTable,
+  ledgerEntriesTable,
+  payrollEntriesTable,
+  gatewaySettlementsTable,
 } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import {
   GetReconciliationMatchesResponse,
   RunReconciliationResponse,
   ApproveMatchResponse,
   RejectMatchResponse,
 } from "@workspace/api-zod";
+import { runFullReconciliation } from "../services/matchingEngine";
+import { auditAction, getCompanyId, requirePermission } from "../middleware/authz";
 
 const router: IRouter = Router();
 
@@ -43,10 +47,11 @@ const mapMatch = (m: typeof reconciliationMatchesTable.$inferSelect, txn?: typeo
   } : null,
 });
 
-router.get("/reconciliation", async (req, res): Promise<void> => {
-  const matches = await db.select().from(reconciliationMatchesTable).orderBy(desc(reconciliationMatchesTable.createdAt));
-  const txns = await db.select().from(bankTransactionsTable);
-  const invoices = await db.select().from(invoicesTable);
+router.get("/reconciliation", requirePermission("reconciliation.read"), async (req, res): Promise<void> => {
+  const companyId = getCompanyId(req);
+  const matches = await db.select().from(reconciliationMatchesTable).where(eq(reconciliationMatchesTable.companyId, companyId)).orderBy(desc(reconciliationMatchesTable.createdAt));
+  const txns = await db.select().from(bankTransactionsTable).where(eq(bankTransactionsTable.companyId, companyId));
+  const invoices = await db.select().from(invoicesTable).where(eq(invoicesTable.companyId, companyId));
 
   const txnMap = Object.fromEntries(txns.map(t => [t.id, t]));
   const invMap = Object.fromEntries(invoices.map(i => [i.id, i]));
@@ -63,60 +68,66 @@ router.get("/reconciliation", async (req, res): Promise<void> => {
   ));
 });
 
-router.post("/reconciliation/run", async (req, res): Promise<void> => {
-  const txns = await db.select().from(bankTransactionsTable);
-  const matches = await db.select().from(reconciliationMatchesTable);
+async function runReconciliation(req: Request, res: Response): Promise<void> {
+  const companyId = getCompanyId(req);
+  const txns = await db.select().from(bankTransactionsTable).where(eq(bankTransactionsTable.companyId, companyId));
+  const invoices = await db.select().from(invoicesTable).where(eq(invoicesTable.companyId, companyId));
+  const ledgerEntries = await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.companyId, companyId));
+  const payrollEntries = await db.select().from(payrollEntriesTable).where(eq(payrollEntriesTable.companyId, companyId));
+  const gatewaySettlements = await db.select().from(gatewaySettlementsTable).where(eq(gatewaySettlementsTable.companyId, companyId));
+  const existingMatches = await db.select().from(reconciliationMatchesTable).where(eq(reconciliationMatchesTable.companyId, companyId));
 
-  const existingMatchedTxnIds = new Set(matches.map(m => m.bankTransactionId).filter(Boolean));
-  const newMatches: typeof reconciliationMatchesTable.$inferInsert[] = [];
+  const existingKeys = new Set(
+    existingMatches.map(m => `${m.bankTransactionId ?? "none"}:${m.invoiceId ?? "none"}:${m.ledgerEntryId ?? "none"}:${m.matchType}`)
+  );
+  const reconciliation = runFullReconciliation({
+    transactions: txns,
+    invoices,
+    ledgerEntries,
+    payrollEntries,
+    gatewaySettlements,
+  });
 
-  for (const txn of txns) {
-    if (existingMatchedTxnIds.has(txn.id)) continue;
-    if (txn.status === "verified") continue;
-
-    if (txn.confidenceScore >= 85) {
-      newMatches.push({
-        bankTransactionId: txn.id,
-        matchType: "exact",
-        confidenceScore: txn.confidenceScore,
-        reason: "Auto-matched by reconciliation engine",
-        status: "pending",
-      });
-    } else if (txn.confidenceScore >= 60) {
-      newMatches.push({
-        bankTransactionId: txn.id,
-        matchType: "potential",
-        confidenceScore: txn.confidenceScore,
-        reason: "Potential match — needs review",
-        status: "pending",
-      });
-    }
-  }
+  const newMatches: typeof reconciliationMatchesTable.$inferInsert[] = reconciliation.matches
+    .filter(match => !existingKeys.has(`${match.bankTransactionId ?? "none"}:${match.invoiceId ?? "none"}:${match.ledgerEntryId ?? "none"}:${match.matchType}`))
+    .slice(0, 50)
+    .map(match => ({
+      bankTransactionId: match.bankTransactionId ?? null,
+      companyId,
+      invoiceId: match.invoiceId ?? null,
+      ledgerEntryId: match.ledgerEntryId ?? null,
+      matchType: match.matchType,
+      confidenceScore: match.confidenceScore,
+      reason: match.reason,
+      status: match.status,
+    }));
 
   if (newMatches.length > 0) {
     await db.insert(reconciliationMatchesTable).values(newMatches);
   }
 
-  const verified = newMatches.filter(m => m.matchType === "exact").length;
-  const potential = newMatches.filter(m => m.matchType === "potential").length;
+  const verified = newMatches.filter(m => (m.confidenceScore ?? 0) >= 85).length;
+  const potential = newMatches.filter(m => (m.confidenceScore ?? 0) >= 60 && (m.confidenceScore ?? 0) < 85).length;
+
+  await auditAction(req, "reconciliation.run", "reconciliation", null, { matchesFound: newMatches.length });
 
   res.json(RunReconciliationResponse.parse({
     matchesFound: newMatches.length,
     newVerified: verified,
     newPotential: potential,
-    newUnverified: txns.filter(t => t.confidenceScore < 60 && !existingMatchedTxnIds.has(t.id)).length,
-    message: `Reconciliation complete. Found ${newMatches.length} new matches.`,
+    newUnverified: txns.filter(t => t.confidenceScore < 60).length,
+    message: `Reconciliation complete. Found ${newMatches.length} new rule-based matches.`,
   }));
-});
+}
 
-router.post("/reconciliation/:id/approve", async (req, res): Promise<void> => {
+async function approveMatch(req: Request, res: Response): Promise<void> {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [m] = await db.update(reconciliationMatchesTable)
     .set({ status: "approved" })
-    .where(eq(reconciliationMatchesTable.id, id))
+    .where(and(eq(reconciliationMatchesTable.id, id), eq(reconciliationMatchesTable.companyId, getCompanyId(req))))
     .returning();
 
   if (!m) { res.status(404).json({ error: "Match not found" }); return; }
@@ -124,25 +135,40 @@ router.post("/reconciliation/:id/approve", async (req, res): Promise<void> => {
   if (m.bankTransactionId) {
     await db.update(bankTransactionsTable)
       .set({ status: "verified" })
-      .where(eq(bankTransactionsTable.id, m.bankTransactionId));
+      .where(and(eq(bankTransactionsTable.id, m.bankTransactionId), eq(bankTransactionsTable.companyId, getCompanyId(req))));
   }
 
+  await auditAction(req, "reconciliation.approved", "reconciliation", m.id);
   res.json(ApproveMatchResponse.parse(mapMatch(m)));
-});
+}
 
-router.post("/reconciliation/:id/reject", async (req, res): Promise<void> => {
+async function rejectMatch(req: Request, res: Response): Promise<void> {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [m] = await db.update(reconciliationMatchesTable)
     .set({ status: "rejected" })
-    .where(eq(reconciliationMatchesTable.id, id))
+    .where(and(eq(reconciliationMatchesTable.id, id), eq(reconciliationMatchesTable.companyId, getCompanyId(req))))
     .returning();
 
   if (!m) { res.status(404).json({ error: "Match not found" }); return; }
 
+  await auditAction(req, "reconciliation.rejected", "reconciliation", m.id);
   res.json(RejectMatchResponse.parse(mapMatch(m)));
+}
+
+router.post("/reconciliation/run", requirePermission("reconciliation.run"), runReconciliation);
+router.get("/reconciliation/run", requirePermission("reconciliation.run"), runReconciliation);
+router.post("/reconciliation/:id/approve", requirePermission("reconciliation.approve"), approveMatch);
+router.post("/reconciliation/:id/reject", requirePermission("reconciliation.reject"), rejectMatch);
+router.post("/reconciliation/approve", requirePermission("reconciliation.approve"), (req, res) => {
+  (req.params as Record<string, string>).id = String(req.body?.id ?? req.query.id ?? "");
+  void approveMatch(req, res);
+});
+router.post("/reconciliation/reject", requirePermission("reconciliation.reject"), (req, res) => {
+  (req.params as Record<string, string>).id = String(req.body?.id ?? req.query.id ?? "");
+  void rejectMatch(req, res);
 });
 
 export default router;

@@ -1,32 +1,69 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  LayoutDashboard, Upload, ArrowLeftRight, FileText, GitMerge,
-  CheckSquare, AlertTriangle, Users, CreditCard, ClipboardList,
-  BarChart3, Puzzle, Settings, LogOut, ChevronLeft, CheckCircle,
-  Bell, Search, Menu
+  AlertTriangle,
+  ArrowLeftRight,
+  BarChart3,
+  Bell,
+  CheckSquare,
+  ChevronLeft,
+  ClipboardList,
+  CreditCard,
+  FileText,
+  GitMerge,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Puzzle,
+  Search,
+  Settings,
+  Upload,
+  Users,
 } from "lucide-react";
+import { BrandMark } from "@/components/app/finverify-ui";
 import { getUser, logout } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
-const navItems = [
-  { label: "Overview", href: "/app/overview", icon: LayoutDashboard },
-  { label: "Upload Center", href: "/app/uploads", icon: Upload },
-  { type: "divider", label: "Financials" },
-  { label: "Transactions", href: "/app/transactions", icon: ArrowLeftRight },
-  { label: "Invoices", href: "/app/invoices", icon: FileText },
-  { label: "Ledger Match", href: "/app/ledger-match", icon: GitMerge },
-  { type: "divider", label: "Verification" },
-  { label: "Reconciliation", href: "/app/reconciliation", icon: CheckSquare },
-  { label: "GST / TDS Risks", href: "/app/gst-tds-risks", icon: AlertTriangle },
-  { label: "Payroll", href: "/app/payroll", icon: Users },
-  { label: "Gateway Settlements", href: "/app/gateway-settlements", icon: CreditCard },
-  { type: "divider", label: "CA Workflow" },
-  { label: "CA Review Queue", href: "/app/ca-review", icon: ClipboardList },
-  { label: "Reports", href: "/app/reports", icon: BarChart3 },
-  { type: "divider", label: "Settings" },
-  { label: "Integrations", href: "/app/integrations", icon: Puzzle },
-  { label: "Settings", href: "/app/settings", icon: Settings },
+const navGroups = [
+  {
+    label: "Control room",
+    items: [
+      { label: "Overview", href: "/app/overview", icon: LayoutDashboard },
+      { label: "Upload Center", href: "/app/uploads", icon: Upload },
+    ],
+  },
+  {
+    label: "Financials",
+    items: [
+      { label: "Transactions", href: "/app/transactions", icon: ArrowLeftRight },
+      { label: "Invoices", href: "/app/invoices", icon: FileText },
+      { label: "Ledger Match", href: "/app/ledger-match", icon: GitMerge },
+    ],
+  },
+  {
+    label: "Verification",
+    items: [
+      { label: "Reconciliation", href: "/app/reconciliation", icon: CheckSquare },
+      { label: "GST / TDS Risks", href: "/app/gst-tds-risks", icon: AlertTriangle },
+      { label: "Payroll", href: "/app/payroll", icon: Users },
+      { label: "Gateway Settlements", href: "/app/gateway-settlements", icon: CreditCard },
+    ],
+  },
+  {
+    label: "CA workflow",
+    items: [
+      { label: "CA Review Queue", href: "/app/ca-review", icon: ClipboardList },
+      { label: "Reports", href: "/app/reports", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { label: "Integrations", href: "/app/integrations", icon: Puzzle },
+      { label: "Settings", href: "/app/settings", icon: Settings },
+    ],
+  },
 ] as const;
 
 interface AppShellProps {
@@ -50,77 +87,77 @@ export default function AppShell({ children }: AppShellProps) {
     navigate("/login");
   };
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className={`flex items-center gap-2.5 px-4 h-16 border-b border-border ${collapsed ? "justify-center" : ""}`}>
-        <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-          <CheckCircle className="w-4 h-4 text-white" />
+  const Sidebar = () => (
+    <div className="flex h-full flex-col">
+      <div className={cn("flex h-20 items-center border-b border-border px-4", collapsed ? "justify-center" : "justify-between")}>
+        <div className={cn("min-w-0", collapsed && "hidden")}>
+          <BrandMark />
+          <div className="mt-1 truncate text-xs text-muted-foreground">{user.company}</div>
         </div>
-        {!collapsed && (
-          <div>
-            <div className="font-semibold text-sm leading-tight">FinVerify OS</div>
-            <div className="text-xs text-muted-foreground truncate max-w-[140px]">{user.company}</div>
-          </div>
-        )}
+        {collapsed && <BrandMark compact />}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2">
-        {navItems.map((item, idx) => {
-          if ("type" in item && item.type === "divider") {
-            if (collapsed) return <div key={idx} className="my-2 h-px bg-border mx-2" />;
-            return (
-              <div key={idx} className="px-3 pt-4 pb-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">{item.label}</span>
+      <nav className="flex-1 overflow-y-auto px-2 py-4">
+        {navGroups.map(group => (
+          <div key={group.label} className="mb-4">
+            {!collapsed && (
+              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">
+                {group.label}
               </div>
-            );
-          }
-
-          const navItem = item as { label: string; href: string; icon: React.ComponentType<{ className?: string }> };
-          const Icon = navItem.icon;
-          const isActive = location === navItem.href || (location === "/app" && navItem.href === "/app/overview");
-
-          return (
-            <button
-              key={navItem.href}
-              onClick={() => { navigate(navItem.href); setMobileOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5 ${
-                collapsed ? "justify-center" : ""
-              } ${
-                isActive
-                  ? "bg-primary text-white"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-              }`}
-              title={collapsed ? navItem.label : undefined}
-            >
-              <Icon className={`flex-shrink-0 ${collapsed ? "w-5 h-5" : "w-4 h-4"}`} />
-              {!collapsed && navItem.label}
-            </button>
-          );
-        })}
+            )}
+            <div className="space-y-1">
+              {group.items.map(item => {
+                const Icon = item.icon;
+                const active = location === item.href || (location === "/app" && item.href === "/app/overview");
+                return (
+                  <button
+                    key={item.href}
+                    type="button"
+                    title={collapsed ? item.label : undefined}
+                    onClick={() => {
+                      navigate(item.href);
+                      setMobileOpen(false);
+                    }}
+                    className={cn(
+                      "group relative flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+                      collapsed && "justify-center",
+                      active
+                        ? "bg-primary/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    {active && <span className="absolute left-0 top-2 h-6 w-1 rounded-r-full bg-primary" />}
+                    <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      {/* User */}
-      <div className={`border-t border-border p-3 ${collapsed ? "flex justify-center" : ""}`}>
+      <div className={cn("border-t border-border p-3", collapsed && "flex justify-center")}>
         {collapsed ? (
-          <button onClick={handleLogout} className="p-2 rounded-lg hover:bg-muted/60 text-muted-foreground" title="Logout">
-            <LogOut className="w-4 h-4" />
+          <button type="button" onClick={handleLogout} className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Logout">
+            <LogOut className="h-4 w-4" />
           </button>
         ) : (
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-semibold text-primary">
+          <div className="rounded-2xl border border-border bg-background p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                 {user.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-              </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold">{user.name}</div>
+                <div className="mt-0.5 inline-flex rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-semibold capitalize text-muted-foreground">
+                  {user.role}
+                </div>
+              </div>
+              <button type="button" onClick={handleLogout} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Logout">
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium truncate">{user.name}</div>
-              <div className="text-[10px] text-muted-foreground capitalize">{user.role}</div>
-            </div>
-            <button onClick={handleLogout} className="p-1.5 rounded hover:bg-muted/60 text-muted-foreground">
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
           </div>
         )}
       </div>
@@ -128,17 +165,11 @@ export default function AppShell({ children }: AppShellProps) {
   );
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {/* Desktop sidebar */}
-      <aside
-        className={`hidden lg:flex flex-col bg-card border-r border-border transition-all duration-200 flex-shrink-0 ${
-          collapsed ? "w-16" : "w-56"
-        }`}
-      >
-        <SidebarContent />
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      <aside className={cn("hidden shrink-0 border-r border-border bg-card transition-all duration-200 lg:flex", collapsed ? "w-[4.5rem]" : "w-64")}>
+        <Sidebar />
       </aside>
 
-      {/* Mobile sidebar */}
       <AnimatePresence>
         {mobileOpen && (
           <>
@@ -147,54 +178,73 @@ export default function AppShell({ children }: AppShellProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
-              className="lg:hidden fixed inset-0 bg-black/40 z-40"
+              className="fixed inset-0 z-40 bg-black/35 lg:hidden"
             />
             <motion.aside
-              initial={{ x: -256 }}
+              initial={{ x: -288 }}
               animate={{ x: 0 }}
-              exit={{ x: -256 }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="lg:hidden fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border z-50 flex flex-col"
+              exit={{ x: -288 }}
+              transition={{ type: "spring", damping: 28, stiffness: 220 }}
+              className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card lg:hidden"
             >
-              <SidebarContent />
+              <Sidebar />
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Topbar */}
-        <header className="h-14 border-b border-border bg-card/50 flex items-center px-4 gap-3 flex-shrink-0">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur sm:px-5">
           <button
-            onClick={() => collapsed ? setCollapsed(false) : setCollapsed(true)}
-            className="hidden lg:block p-1.5 rounded hover:bg-muted/60 text-muted-foreground transition-colors"
+            type="button"
+            onClick={() => setCollapsed(v => !v)}
+            className="hidden rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground lg:inline-flex"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {collapsed ? <Menu className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            {collapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
           <button
+            type="button"
             onClick={() => setMobileOpen(true)}
-            className="lg:hidden p-1.5 rounded hover:bg-muted/60 text-muted-foreground"
+            className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
+            aria-label="Open menu"
           >
-            <Menu className="w-4 h-4" />
+            <Menu className="h-4 w-4" />
           </button>
-          <div className="flex-1" />
-          <button className="p-2 rounded-lg hover:bg-muted/60 text-muted-foreground transition-colors">
-            <Search className="w-4 h-4" />
-          </button>
-          <button className="p-2 rounded-lg hover:bg-muted/60 text-muted-foreground transition-colors relative">
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full" />
-          </button>
-          <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">
-            <span className="text-xs font-semibold text-primary">
-              {user.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-            </span>
+
+          <div className="relative hidden min-w-0 max-w-xl flex-1 md:block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              aria-label="Global search"
+              placeholder="Search invoices, UTRs, vendors, risks..."
+              className="fv-input w-full pl-9"
+            />
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
+            <select aria-label="Company switcher" className="fv-input hidden w-48 md:block">
+              <option>{user.company}</option>
+            </select>
+            <select aria-label="Month selector" className="fv-input hidden w-32 sm:block">
+              <option>May 2026</option>
+              <option>April 2026</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => navigate("/app/uploads")}
+              className="fv-button-primary hidden sm:inline-flex"
+            >
+              <Upload className="h-4 w-4" />
+              Upload
+            </button>
+            <button type="button" className="relative rounded-xl border border-border bg-card p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Notifications">
+              <Bell className="h-4 w-4" />
+              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+            </button>
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="min-h-0 flex-1 overflow-y-auto">
           {children}
         </main>
       </div>

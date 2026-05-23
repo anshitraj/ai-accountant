@@ -1,169 +1,138 @@
 import { motion } from "framer-motion";
-import { Puzzle, CheckCircle, ExternalLink, Zap } from "lucide-react";
+import { Puzzle, CheckCircle, Clock, UploadCloud } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
-import { useToast } from "@/hooks/use-toast";
 
 const INTEGRATIONS = [
   {
-    name: "Razorpay",
-    desc: "Auto-sync payment gateway settlements and reconcile with bank",
-    category: "Payment Gateway",
-    status: "connected",
-    color: "bg-blue-50 border-blue-100",
-    icon: "💳",
+    name: "CSV Upload",
+    handles: "Bank statements, invoices, expenses, payroll, gateway exports",
+    status: "Available",
+    complexity: "Low",
+    notes: "Runs locally in prototype mode with row and column mapping previews.",
   },
   {
-    name: "HDFC NetBanking",
-    desc: "Auto-import bank statements via secure bank feed",
-    category: "Bank",
-    status: "connected",
-    color: "bg-red-50 border-red-100",
-    icon: "🏦",
+    name: "Excel Upload",
+    handles: "Tally exports, Zoho exports, payroll sheets, gateway settlements",
+    status: "Upload-based",
+    complexity: "Low",
+    notes: "Metadata capture is available. Full XLSX parsing can be enabled with an XLSX parser.",
   },
   {
-    name: "GSTN Portal",
-    desc: "Fetch GSTR-2A/2B for ITC matching and GSTIN validation",
-    category: "GST",
-    status: "connected",
-    color: "bg-green-50 border-green-100",
-    icon: "🧾",
+    name: "PDF/Image Invoice Upload",
+    handles: "Invoice images, scanned PDFs, vendor bills",
+    status: "Upload-based",
+    complexity: "Medium",
+    notes: "Extraction-ready placeholder. Does not claim completed OCR without a configured extractor.",
   },
   {
-    name: "Tally ERP",
-    desc: "Import trial balance and ledger data for reconciliation",
-    category: "Accounting",
-    status: "disconnected",
-    color: "bg-orange-50 border-orange-100",
-    icon: "📊",
+    name: "Tally Export Upload",
+    handles: "Ledger entries, vouchers, trial balance exports",
+    status: "Upload-based",
+    complexity: "Medium",
+    notes: "No live Tally connector in this prototype.",
   },
   {
-    name: "Zoho Books",
-    desc: "Sync invoices, vendor payments, and chart of accounts",
-    category: "Accounting",
-    status: "disconnected",
-    color: "bg-blue-50 border-blue-100",
-    icon: "📚",
+    name: "Zoho Export Upload",
+    handles: "Invoices, vendor bills, chart of accounts exports",
+    status: "Upload-based",
+    complexity: "Medium",
+    notes: "No Zoho Books API connection is active yet.",
   },
   {
-    name: "TRACES / TDS Portal",
-    desc: "Validate TDS deductions with Form 26AS and challan data",
-    category: "TDS",
-    status: "disconnected",
-    color: "bg-purple-50 border-purple-100",
-    icon: "🔒",
+    name: "Direct Tally Connector",
+    handles: "Ledgers, vouchers, masters",
+    status: "Coming soon",
+    complexity: "High",
+    notes: "Will require customer-side setup and secure sync permissions.",
   },
   {
-    name: "Stripe",
-    desc: "Import international payment settlements in INR",
-    category: "Payment Gateway",
-    status: "disconnected",
-    color: "bg-indigo-50 border-indigo-100",
-    icon: "⚡",
+    name: "Zoho Books API",
+    handles: "Invoices, bills, payments, contacts",
+    status: "Coming soon",
+    complexity: "Medium",
+    notes: "OAuth/API setup planned for future versions.",
   },
   {
-    name: "Greythr / Keka",
-    desc: "Sync payroll disbursements and employee bank transfers",
-    category: "Payroll",
-    status: "disconnected",
-    color: "bg-teal-50 border-teal-100",
-    icon: "👥",
+    name: "Razorpay / Cashfree / Stripe APIs",
+    handles: "Settlements, fees, refunds, chargebacks",
+    status: "Coming soon",
+    complexity: "Medium",
+    notes: "Current support is upload-based settlement CSV review only.",
+  },
+  {
+    name: "GST/GSP Integration",
+    handles: "GST 2B/3B checks, GSTIN validation, filing references",
+    status: "Coming soon",
+    complexity: "High",
+    notes: "Future work. Potential risks still require CA review.",
+  },
+  {
+    name: "Account Aggregator Bank Feed",
+    handles: "Consent-based bank transaction feed",
+    status: "Coming soon",
+    complexity: "High",
+    notes: "Prototype does not connect to live bank feeds.",
+  },
+  {
+    name: "Gmail / WhatsApp Collection",
+    handles: "Invoice and document collection",
+    status: "Coming soon",
+    complexity: "Medium",
+    notes: "Planned document intake workflow; not active in this prototype.",
   },
 ];
 
+function statusClass(status: string) {
+  if (status === "Available") return "bg-green-100 text-green-800 border-green-200";
+  if (status === "Upload-based") return "bg-blue-100 text-blue-800 border-blue-200";
+  return "bg-amber-100 text-amber-800 border-amber-200";
+}
+
 export default function IntegrationsPage() {
-  const { toast } = useToast();
-
-  const connected = INTEGRATIONS.filter(i => i.status === "connected");
-  const available = INTEGRATIONS.filter(i => i.status === "disconnected");
-
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <PageHeader
         title="Integrations"
-        subtitle="Connect your financial tools for automated data sync"
+        subtitle="Upload-based today, direct connectors on the roadmap"
       />
 
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-6 flex items-start gap-3">
-        <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+        <UploadCloud className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
         <p className="text-sm text-muted-foreground">
-          Connected integrations auto-sync data nightly and trigger reconciliation runs. You can also
-          manually trigger a sync from each integration card.
+          FinVerify OS does not claim live Tally, GST, bank, or gateway connections in this prototype.
+          Available workflows are upload-based unless marked as coming soon.
         </p>
       </div>
 
-      {/* Connected */}
-      <div className="mb-6">
-        <div className="text-sm font-semibold mb-3 flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-success" />
-          Connected ({connected.length})
-        </div>
-        <div className="grid md:grid-cols-2 gap-3">
-          {connected.map((int, i) => (
-            <motion.div
-              key={int.name}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 * i }}
-              className={`flex items-center justify-between p-4 border rounded-xl ${int.color}`}
-            >
+      <div className="grid md:grid-cols-2 gap-4">
+        {INTEGRATIONS.map((integration, i) => (
+          <motion.div
+            key={integration.name}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.03 * i }}
+            className="bg-card border border-border rounded-xl p-5"
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{int.icon}</span>
+                <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  {integration.status === "Coming soon" ? <Clock className="w-4 h-4" /> : integration.status === "Available" ? <CheckCircle className="w-4 h-4" /> : <Puzzle className="w-4 h-4" />}
+                </div>
                 <div>
-                  <div className="text-sm font-medium">{int.name}</div>
-                  <div className="text-xs text-muted-foreground">{int.desc}</div>
-                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">{int.category}</div>
+                  <div className="text-sm font-semibold">{integration.name}</div>
+                  <div className="text-xs text-muted-foreground">Setup complexity: {integration.complexity}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-xs text-success font-medium">
-                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                  Connected
-                </div>
-                <button
-                  onClick={() => toast({ title: `Syncing ${int.name}`, description: "Data sync started. Usually takes 1-2 minutes." })}
-                  className="text-xs px-2 py-1 border border-current/20 rounded text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Sync
-                </button>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* Available */}
-      <div>
-        <div className="text-sm font-semibold mb-3 flex items-center gap-2">
-          <Puzzle className="w-4 h-4 text-muted-foreground" />
-          Available Integrations ({available.length})
-        </div>
-        <div className="grid md:grid-cols-2 gap-3">
-          {available.map((int, i) => (
-            <motion.div
-              key={int.name}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 * (i + connected.length) }}
-              className="flex items-center justify-between p-4 border border-border rounded-xl bg-card hover:bg-muted/20 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{int.icon}</span>
-                <div>
-                  <div className="text-sm font-medium">{int.name}</div>
-                  <div className="text-xs text-muted-foreground">{int.desc}</div>
-                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">{int.category}</div>
-                </div>
-              </div>
-              <button
-                onClick={() => toast({ title: "Coming soon", description: `${int.name} integration available in v2.` })}
-                className="flex items-center gap-1 text-xs px-3 py-1.5 border border-border rounded-lg text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Connect
-              </button>
-            </motion.div>
-          ))}
-        </div>
+              <span className={`px-2 py-1 rounded-md border text-[11px] font-medium ${statusClass(integration.status)}`}>
+                {integration.status}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground mb-2">
+              <span className="font-medium text-foreground">Handles:</span> {integration.handles}
+            </div>
+            <p className="text-xs text-muted-foreground">{integration.notes}</p>
+          </motion.div>
+        ))}
       </div>
     </div>
   );

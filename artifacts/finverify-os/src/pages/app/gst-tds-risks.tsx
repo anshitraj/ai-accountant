@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { AlertTriangle, CheckCircle, Shield } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
 import StatusBadge from "@/components/app/StatusBadge";
-import { severityColor, statusLabel } from "@/lib/format";
+import { formatCurrencyFull, severityColor } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -21,6 +21,20 @@ interface RiskFlag {
   createdAt: string;
 }
 
+interface GstRecord {
+  id: number;
+  period: string;
+  sourceType: string;
+  gstin?: string | null;
+  counterpartyName?: string | null;
+  invoiceNumber?: string | null;
+  invoiceDate?: string | null;
+  taxableValue: number;
+  gstAmount: number;
+  matchStatus: string;
+  riskStatus: string;
+}
+
 export default function GstTdsRisksPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -31,6 +45,10 @@ export default function GstTdsRisksPage() {
   const { data = [], isLoading } = useQuery<RiskFlag[]>({
     queryKey: ["risks"],
     queryFn: () => fetch(`${BASE}/api/risks`).then(r => r.json()),
+  });
+  const { data: gstRecords = [], isLoading: gstLoading } = useQuery<GstRecord[]>({
+    queryKey: ["gstRecords"],
+    queryFn: () => fetch(`${BASE}/api/gst-records`).then(r => r.json()),
   });
 
   const resolveMutation = useMutation({
@@ -62,7 +80,7 @@ export default function GstTdsRisksPage() {
     <div className="p-6 max-w-5xl mx-auto">
       <PageHeader
         title="GST / TDS Risk Flags"
-        subtitle="Proactive compliance issues detected before CA review"
+        subtitle="Structured GST/TDS records and potential risks before CA review"
       />
 
       {/* Summary */}
@@ -80,6 +98,58 @@ export default function GstTdsRisksPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="bg-card border border-border rounded-xl overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold">Structured GST / TDS Data</div>
+            <div className="text-xs text-muted-foreground">From uploaded GST 2B/3B/TDS files. Potential risk — needs CA review.</div>
+          </div>
+          <div className="text-xs text-muted-foreground">{gstRecords.length} records</div>
+        </div>
+        {gstLoading ? (
+          <div className="p-6 text-sm text-muted-foreground text-center">Loading GST/TDS records...</div>
+        ) : gstRecords.length === 0 ? (
+          <div className="p-6 text-sm text-muted-foreground text-center">No structured GST/TDS records yet. Seed demo data or upload GST/TDS files.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="text-left font-medium px-4 py-3">Period</th>
+                  <th className="text-left font-medium px-4 py-3">Source</th>
+                  <th className="text-left font-medium px-4 py-3">Counterparty</th>
+                  <th className="text-left font-medium px-4 py-3">Invoice</th>
+                  <th className="text-right font-medium px-4 py-3">Taxable</th>
+                  <th className="text-right font-medium px-4 py-3">GST/TDS</th>
+                  <th className="text-left font-medium px-4 py-3">Match</th>
+                  <th className="text-left font-medium px-4 py-3">Risk</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {gstRecords.map(record => (
+                  <tr key={record.id} className="hover:bg-muted/20">
+                    <td className="px-4 py-3 whitespace-nowrap">{record.period}</td>
+                    <td className="px-4 py-3 uppercase text-xs text-muted-foreground">{record.sourceType}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{record.counterpartyName ?? "Unknown"}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{record.gstin ?? "GSTIN missing"}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-mono text-xs">{record.invoiceNumber ?? "Missing"}</div>
+                      <div className="text-xs text-muted-foreground">{record.invoiceDate ?? "-"}</div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">{formatCurrencyFull(record.taxableValue)}</td>
+                    <td className="px-4 py-3 text-right font-mono">{formatCurrencyFull(record.gstAmount)}</td>
+                    <td className="px-4 py-3"><StatusBadge status={record.matchStatus} /></td>
+                    <td className="px-4 py-3"><StatusBadge status={record.riskStatus} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Filters */}

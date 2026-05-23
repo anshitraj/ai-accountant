@@ -1,13 +1,14 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { payrollEntriesTable } from "@workspace/db";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { GetPayrollEntriesResponse } from "@workspace/api-zod";
+import { getCompanyId, requirePermission } from "../middleware/authz";
 
 const router: IRouter = Router();
 
-router.get("/payroll", async (req, res): Promise<void> => {
-  const entries = await db.select().from(payrollEntriesTable).orderBy(desc(payrollEntriesTable.createdAt));
+router.get("/payroll", requirePermission("payroll.read"), async (req, res): Promise<void> => {
+  const entries = await db.select().from(payrollEntriesTable).where(eq(payrollEntriesTable.companyId, getCompanyId(req))).orderBy(desc(payrollEntriesTable.createdAt));
   res.json(GetPayrollEntriesResponse.parse(
     entries.map(e => ({
       id: e.id,

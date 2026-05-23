@@ -1,0 +1,129 @@
+:root {
+  --fv-bg-page: #fafaf7;
+  --fv-bg-surface: #ffffff;
+  --fv-bg-subtle: #f5f7fa;
+  --fv-bg-warm: #fff7ed;
+
+  --fv-text-primary: #101828;
+  --fv-text-secondary: #667085;
+  --fv-text-muted: #98a2b3;
+
+  --fv-border: #e5e7eb;
+  --fv-border-strong: #d0d5dd;
+
+  --fv-accent: #f26b3a;
+  --fv-accent-dark: #d94a1e;
+  --fv-success: #0f9f6e;
+  --fv-warning: #d97706;
+  --fv-risk: #dc2626;
+  --fv-info: #2563eb;
+
+  --fv-status-verified-bg: #ecfdf3;
+  --fv-status-verified-text: #067647;
+  --fv-status-unverified-bg: #f2f4f7;
+  --fv-status-unverified-text: #475467;
+  --fv-status-risk-bg: #fef2f2;
+  --fv-status-risk-text: #b42318;
+  --fv-status-review-bg: #eff6ff;
+  --fv-status-review-text: #175cd3;
+  --fv-status-missing-bg: #fffaeb;
+  --fv-status-missing-text: #b54708;
+
+  --fv-radius-sm: 10px;
+  --fv-radius-md: 14px;
+  --fv-radius-lg: 16px;
+  --fv-radius-xl: 20px;
+
+  --fv-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 24px rgba(16, 24, 40, 0.04);
+  --fv-shadow-float: 0 18px 60px rgba(16, 24, 40, 0.12);
+  --fv-focus: 0 0 0 3px rgba(242, 107, 58, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer components {
+  .fv-page {
+    @apply min-h-full bg-background text-foreground;
+  }
+
+  .fv-container {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .fv-card {
+    @apply rounded-2xl border border-border bg-card;
+    box-shadow: var(--fv-shadow-card);
+  }
+
+  .fv-card-flat {
+    @apply rounded-2xl border border-border bg-card;
+  }
+
+  .fv-button-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition;
+  }
+
+  .fv-button-primary:hover {
+    background: var(--fv-accent-dark);
+    transform: translateY(-1px);
+  }
+
+  .fv-button-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition;
+  }
+
+  .fv-button-secondary:hover {
+    @apply bg-muted;
+    transform: translateY(-1px);
+  }
+
+  .fv-button-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground;
+  }
+
+  .fv-focus {
+    @apply outline-none;
+  }
+
+  .fv-focus:focus-visible {
+    box-shadow: var(--fv-focus);
+  }
+
+  .fv-input {
+    @apply h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none transition placeholder:text-muted-foreground;
+  }
+
+  .fv-input:focus {
+    border-color: rgba(242, 107, 58, 0.55);
+    box-shadow: var(--fv-focus);
+  }
+
+  .fv-table {
+    @apply w-full border-separate border-spacing-0 text-sm;
+  }
+
+  .fv-table thead th {
+    @apply sticky top-0 z-10 border-b border-border bg-muted/70 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground;
+  }
+
+  .fv-table tbody td {
+    @apply border-b border-border px-4 py-3 align-middle;
+  }
+
+  .fv-table tbody tr:hover td {
+    @apply bg-muted/30;
+  }
+
+  .fv-section-band {
+    @apply border-y border-border bg-card;
+  }
+}

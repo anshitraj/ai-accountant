@@ -63,9 +63,12 @@ export default function ReportsPage() {
   const scoreColor = score >= 85 ? "text-success" : score >= 60 ? "text-warning" : "text-destructive";
 
   const exports = [
-    { type: "transactions", label: "Bank Transactions", icon: FileText, desc: "All transactions with status and confidence scores" },
+    { type: "ca_ready", label: "CA-ready Report", icon: BarChart3, desc: "Verified transactions ready for CA handoff" },
+    { type: "transactions", label: "Verified / Unverified Transactions", icon: FileText, desc: "All transactions with status and confidence scores" },
     { type: "invoices", label: "Invoices", icon: FileText, desc: "Purchase and sales invoices with GST details" },
-    { type: "risks", label: "Risk Flags", icon: AlertTriangle, desc: "GST/TDS risk flags with suggested actions" },
+    { type: "missing_invoices", label: "Missing Documents Report", icon: AlertTriangle, desc: "Transactions that need invoice or document collection" },
+    { type: "risks", label: "Risk Flags Report", icon: AlertTriangle, desc: "Potential GST/TDS and workflow risks with suggested actions" },
+    { type: "reconciliation", label: "Ledger Correction Suggestions", icon: CreditCard, desc: "Suggested matches and review decisions" },
     { type: "payroll", label: "Payroll Register", icon: Users, desc: "Employee-wise salary and payment details" },
   ];
 

@@ -27,9 +27,13 @@ export function statusColor(status: string): string {
     missing_invoice: "bg-amber-100 text-amber-800 border-amber-200",
     missing_gstin: "bg-amber-100 text-amber-800 border-amber-200",
     amount_mismatch: "bg-red-100 text-red-800 border-red-200",
+    date_mismatch: "bg-red-100 text-red-800 border-red-200",
     gst_risk: "bg-red-100 text-red-800 border-red-200",
     tds_risk: "bg-red-100 text-red-800 border-red-200",
+    payroll_mismatch: "bg-red-100 text-red-800 border-red-200",
+    gateway_settlement_mismatch: "bg-orange-100 text-orange-800 border-orange-200",
     needs_ca_review: "bg-blue-100 text-blue-800 border-blue-200",
+    ca_ready: "bg-green-100 text-green-800 border-green-200",
     duplicate: "bg-orange-100 text-orange-800 border-orange-200",
     matched: "bg-green-100 text-green-800 border-green-200",
     unmatched: "bg-amber-100 text-amber-800 border-amber-200",
@@ -46,6 +50,8 @@ export function statusColor(status: string): string {
     fee_mismatch: "bg-orange-100 text-orange-800 border-orange-200",
     processed: "bg-green-100 text-green-800 border-green-200",
     document_requested: "bg-purple-100 text-purple-800 border-purple-200",
+    none: "bg-green-100 text-green-800 border-green-200",
+    tds_review: "bg-red-100 text-red-800 border-red-200",
   };
   return map[status] || "bg-gray-100 text-gray-700 border-gray-200";
 }
@@ -57,9 +63,13 @@ export function statusLabel(status: string): string {
     missing_invoice: "Missing Invoice",
     missing_gstin: "Missing GSTIN",
     amount_mismatch: "Amount Mismatch",
-    gst_risk: "GST Risk",
-    tds_risk: "TDS Risk",
+    date_mismatch: "Date Mismatch",
+    gst_risk: "Potential GST Risk",
+    tds_risk: "Potential TDS Risk",
+    payroll_mismatch: "Payroll Mismatch",
+    gateway_settlement_mismatch: "Gateway Settlement Mismatch",
     needs_ca_review: "Needs CA Review",
+    ca_ready: "CA-ready",
     duplicate: "Duplicate",
     matched: "Matched",
     unmatched: "Unmatched",
@@ -79,8 +89,10 @@ export function statusLabel(status: string): string {
     exact: "Exact Match",
     potential: "Potential Match",
     document_requested: "Doc Requested",
+    none: "No Risk",
+    tds_review: "TDS Review",
   };
-  return map[status] || status;
+  return map[status] || status.replace(/_/g, " ");
 }
 
 export function severityColor(severity: string): string {
@@ -106,7 +118,7 @@ export function exportToCsv(data: Record<string, unknown>[], filename: string): 
       const v = row[h];
       if (v === null || v === undefined) return "";
       const str = String(v);
-      return str.includes(",") ? `"${str}"` : str;
+      return str.includes(",") ? `"${str.replace(/"/g, '""')}"` : str;
     }).join(",")
   );
   const csv = [headers.join(","), ...rows].join("\n");

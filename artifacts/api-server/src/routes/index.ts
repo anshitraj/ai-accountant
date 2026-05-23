@@ -11,6 +11,8 @@ import risksRouter from "./risks";
 import payrollRouter from "./payroll";
 import gatewayRouter from "./gateway";
 import reportsRouter from "./reports";
+import aiRouter from "./ai";
+import platformRouter from "./platform";
 
 const router: IRouter = Router();
 
@@ -26,5 +28,7 @@ router.use(risksRouter);
 router.use(payrollRouter);
 router.use(gatewayRouter);
 router.use(reportsRouter);
+router.use(aiRouter);
+router.use(platformRouter);
 
 export default router;
