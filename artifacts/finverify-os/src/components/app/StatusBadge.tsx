@@ -6,19 +6,19 @@ interface StatusBadgeProps {
 }
 
 export default function StatusBadge({ status, className = "" }: StatusBadgeProps) {
-  const riskStatuses = new Set(["gst_risk", "tds_risk", "amount_mismatch", "date_mismatch", "payroll_mismatch", "gateway_settlement_mismatch", "tds_review"]);
+  const riskStatuses = new Set(["gst_risk", "tds_risk", "amount_mismatch", "date_mismatch", "payroll_mismatch", "gateway_settlement_mismatch", "tds_review", "potential_risk"]);
   const reviewStatuses = new Set(["needs_ca_review", "pending", "document_requested"]);
   const missingStatuses = new Set(["missing_invoice", "missing_gstin", "missing", "unmatched", "partial", "suspense", "fee_mismatch"]);
   const verifiedStatuses = new Set(["verified", "ca_ready", "matched", "approved", "resolved", "paid", "processed", "none", "exact"]);
 
   const semanticClass = riskStatuses.has(status)
-    ? "bg-[var(--fv-status-risk-bg)] text-[var(--fv-status-risk-text)] border-red-200"
+    ? "fv-status-risk"
     : reviewStatuses.has(status)
-      ? "bg-[var(--fv-status-review-bg)] text-[var(--fv-status-review-text)] border-blue-200"
+      ? "fv-status-review"
       : missingStatuses.has(status)
-        ? "bg-[var(--fv-status-missing-bg)] text-[var(--fv-status-missing-text)] border-amber-200"
+        ? "fv-status-missing"
         : verifiedStatuses.has(status)
-          ? "bg-[var(--fv-status-verified-bg)] text-[var(--fv-status-verified-text)] border-emerald-200"
+          ? "fv-status-verified"
           : statusColor(status);
 
   return (

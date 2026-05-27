@@ -335,7 +335,7 @@ export function generateRiskFlags(data: {
         category: amount(txn.amount) >= 50000 ? "High-value payment missing document" : "Vendor payment without invoice",
         severity: amount(txn.amount) >= 50000 ? "high" : "medium",
         reason: `Debit of INR ${amount(txn.amount).toLocaleString("en-IN")} has low document confidence.`,
-        suggestedAction: "Potential risk - needs CA review. Attach invoice or supporting approval before close.",
+        suggestedAction: "Potential risk — needs CA review. Attach invoice or supporting approval before close.",
         status: "open",
       });
     }
@@ -346,7 +346,7 @@ export function generateRiskFlags(data: {
         category: "Possible TDS deduction",
         severity: "high",
         reason: "Payment narration suggests contractor/professional/advance context without a TDS note.",
-        suggestedAction: "Potential risk - needs CA review. Confirm TDS applicability and documentation.",
+        suggestedAction: "Potential risk — needs CA review. Confirm TDS applicability and documentation.",
         status: "open",
       });
     }
@@ -361,7 +361,7 @@ export function generateRiskFlags(data: {
         category: "Duplicate invoice number",
         severity: "medium",
         reason: `Invoice number ${invoice.invoiceNumber} appears more than once.`,
-        suggestedAction: "Potential risk - needs CA review. Verify whether this is a duplicate or revised invoice.",
+        suggestedAction: "Potential risk — needs CA review. Verify whether this is a duplicate or revised invoice.",
         status: "open",
       });
     }
@@ -373,7 +373,7 @@ export function generateRiskFlags(data: {
         category: "Missing GSTIN",
         severity: "medium",
         reason: `Invoice ${invoice.invoiceNumber} is missing a usable GSTIN.`,
-        suggestedAction: "Potential risk - needs CA review. Request a tax invoice or document the treatment.",
+        suggestedAction: "Potential risk — needs CA review. Request a tax invoice or document the treatment.",
         status: "open",
       });
     }
@@ -385,7 +385,7 @@ export function generateRiskFlags(data: {
         category: "GST amount mismatch",
         severity: "medium",
         reason: `GST amount differs from the standard 18% inclusive estimate by more than INR 50.`,
-        suggestedAction: "Potential risk - needs CA review. Check tax rate, place of supply, and invoice math.",
+        suggestedAction: "Potential risk — needs CA review. Check tax rate, place of supply, and invoice math.",
         status: "open",
       });
     }
@@ -399,7 +399,7 @@ export function generateRiskFlags(data: {
         category: "Suspense ledger",
         severity: "low",
         reason: `${ledger.ledgerName} needs a clearer accounting head.`,
-        suggestedAction: "Potential risk - needs CA review. Remap to the correct ledger before handoff.",
+        suggestedAction: "Potential risk — needs CA review. Remap to the correct ledger before handoff.",
         status: "open",
       });
     }
@@ -413,7 +413,7 @@ export function generateRiskFlags(data: {
         category: "Payroll mismatch",
         severity: "low",
         reason: `${entry.employeeName} has no matched salary payout date/reference.`,
-        suggestedAction: "Potential risk - needs CA review. Confirm payout or mark as payable.",
+        suggestedAction: "Potential risk — needs CA review. Confirm payout or mark as payable.",
         status: "open",
       });
     }
@@ -428,7 +428,7 @@ export function generateRiskFlags(data: {
         category: "Gateway settlement mismatch",
         severity: "medium",
         reason: `${settlement.provider} settlement net amount does not match gross minus fees and GST on fees.`,
-        suggestedAction: "Potential risk - needs CA review. Reconcile with gateway settlement export.",
+        suggestedAction: "Potential risk — needs CA review. Reconcile with gateway settlement export.",
         status: "open",
       });
     }

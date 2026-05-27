@@ -9,24 +9,63 @@ export interface AuthUser {
   companyId?: number | null;
 }
 
+export interface AuthSession {
+  user: AuthUser;
+  token?: string;
+  expiresAt?: string;
+}
+
 const AUTH_KEY = "finverify_auth";
 
-export function getUser(): AuthUser | null {
+function readSession(): AuthSession | null {
   try {
     const raw = localStorage.getItem(AUTH_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as AuthUser;
+    const parsed = JSON.parse(raw) as AuthUser | AuthSession;
+    if ("user" in parsed) return parsed;
+    return { user: parsed };
   } catch {
     return null;
   }
 }
 
-export function login(user: AuthUser): void {
-  localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+export function getUser(): AuthUser | null {
+  const session = readSession();
+  if (!session) return null;
+  if (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now()) {
+    localStorage.removeItem(AUTH_KEY);
+    return null;
+  }
+  return session.user;
 }
 
-export function logout(): void {
+export function getAuthToken(): string | null {
+  const session = readSession();
+  if (!session?.token) return null;
+  if (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now()) {
+    localStorage.removeItem(AUTH_KEY);
+    return null;
+  }
+  return session.token;
+}
+
+export function login(userOrSession: AuthUser | AuthSession): void {
+  const session = "user" in userOrSession ? userOrSession : { user: userOrSession };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+}
+
+export async function logout(): Promise<void> {
+  const token = getAuthToken();
   localStorage.removeItem(AUTH_KEY);
+  if (!token) return;
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // Local logout should still succeed if the API is unavailable.
+  }
 }
 
 export function isLoggedIn(): boolean {
@@ -45,12 +84,11 @@ export function installAuthenticatedFetch(): void {
     const isApiRequest = url.includes("/api/") || url.startsWith("/api");
     if (!isApiRequest) return nativeFetch(input, init);
 
-    const user = getUser();
-    if (!user?.id || !user.companyId) return nativeFetch(input, init);
+    const token = getAuthToken();
+    if (!token) return nativeFetch(input, init);
 
     const headers = new Headers(init?.headers);
-    headers.set("x-finverify-user-id", String(user.id));
-    headers.set("x-finverify-company-id", String(user.companyId));
+    headers.set("Authorization", `Bearer ${token}`);
     return nativeFetch(input, { ...init, headers });
   };
 }

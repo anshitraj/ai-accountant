@@ -31,9 +31,9 @@ export default function ReportsPage() {
     queryFn: () => fetch(`${BASE}/api/reports/summary`).then(r => r.json()),
   });
 
-  const handleExport = async (type: string) => {
+  const handleExport = async (type: string, store = false) => {
     try {
-      const result = await fetch(`${BASE}/api/reports/export-csv?type=${type}`).then(r => r.json());
+      const result = await fetch(`${BASE}/api/reports/export-csv?type=${type}${store ? "&store=true" : ""}`).then(r => r.json());
       if (result.data && result.data.length > 0) {
         const headers = Object.keys(result.data[0]);
         const rows = result.data.map((row: Record<string, unknown>) =>
@@ -52,7 +52,12 @@ export default function ReportsPage() {
         a.download = `${type}_report.csv`;
         a.click();
         URL.revokeObjectURL(url);
-        toast({ title: "Exported", description: `${result.rowCount} ${type} records downloaded.` });
+        toast({
+          title: "Exported",
+          description: store && result.storedExport
+            ? `${result.rowCount} ${type} records downloaded and stored.`
+            : `${result.rowCount} ${type} records downloaded.`,
+        });
       }
     } catch {
       toast({ title: "Export failed", description: "Could not generate export.", variant: "destructive" });
@@ -103,7 +108,7 @@ export default function ReportsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: "Verified Txns", val: `${data.verifiedTransactions} / ${data.totalTransactions}`, color: "text-success" },
-              { label: "Missing Invoices", val: String(data.missingInvoices), color: "text-amber-600" },
+              { label: "Missing Invoices", val: String(data.missingInvoices), color: "fv-text-brand-accent" },
               { label: "High-Risk Flags", val: String(data.highRisks), color: "text-destructive" },
               { label: "Total Payroll", val: formatCurrencyFull(data.totalPayroll), color: "text-foreground" },
             ].map(s => (
@@ -144,7 +149,7 @@ export default function ReportsPage() {
                 </div>
                 <button
                   onClick={() => handleExport(ex.type)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                  className="fv-brand-accent-bg flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
                   CSV
@@ -171,8 +176,10 @@ export default function ReportsPage() {
               transactions, resolved flags, and supporting documentation linked to each entry.
             </p>
             <button
-              onClick={() => toast({ title: "Package ready", description: "All 4 reports exported. Share with your CA." })}
-              className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+              onClick={() => {
+                void Promise.all(["ca_ready", "missing_invoices", "risks", "reconciliation"].map(type => handleExport(type, true)));
+              }}
+              className="fv-brand-accent-bg flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
             >
               <Download className="w-4 h-4" />
               Export All for CA

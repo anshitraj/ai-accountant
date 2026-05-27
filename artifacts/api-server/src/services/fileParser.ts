@@ -5,9 +5,12 @@ export interface ParsedFileResult {
   parser: "csv" | "excel" | "pdf" | "unsupported";
   rowCount: number;
   detectedColumns: string[];
+  parsedRows?: Record<string, unknown>[];
   sheetNames?: string[];
   pageCount?: number;
   textPreview?: string;
+  textLength?: number;
+  tablesDetected?: number;
   status: "parsed" | "metadata_only";
   notes: string[];
 }
@@ -43,10 +46,15 @@ export async function parseUploadedFile(file: Express.Multer.File): Promise<Pars
     const text = file.buffer.toString("utf8");
     const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
     const detectedColumns = lines.length > 0 ? parseCsvLine(lines[0]).filter(Boolean).slice(0, 30) : [];
+    const rows = lines.slice(1).map(line => {
+      const cells = parseCsvLine(line);
+      return Object.fromEntries(detectedColumns.map((column, index) => [column, cells[index] ?? ""]));
+    });
     return {
       parser: "csv",
       rowCount: Math.max(lines.length - 1, 0),
       detectedColumns,
+      parsedRows: rows,
       status: "parsed",
       textPreview: lines.slice(0, 4).join("\n").slice(0, 1000),
       notes: ["CSV parsed server-side for row count and detected columns."],
@@ -63,6 +71,7 @@ export async function parseUploadedFile(file: Express.Multer.File): Promise<Pars
       parser: "excel",
       rowCount: rows.length,
       detectedColumns,
+      parsedRows: rows,
       sheetNames: workbook.SheetNames,
       status: "parsed",
       textPreview: rows.slice(0, 3).map(row => JSON.stringify(row)).join("\n").slice(0, 1000),
@@ -85,6 +94,8 @@ export async function parseUploadedFile(file: Express.Multer.File): Promise<Pars
       rowCount: lines.length,
       detectedColumns: likelyColumns,
       pageCount: parsed.total,
+      textLength: parsed.text.length,
+      tablesDetected: likelyColumns.length > 0 ? 1 : 0,
       status: "parsed",
       textPreview: parsed.text.replace(/\s+/g, " ").trim().slice(0, 1000),
       notes: ["PDF text extracted server-side. Field extraction still requires mapping or AI assistance."],

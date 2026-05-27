@@ -147,7 +147,7 @@ export default function ReconciliationPage() {
                       <button type="button" onClick={() => rejectMutation.mutate(match.id)} disabled={rejectMutation.isPending} className="rounded-xl bg-destructive/10 p-2 text-destructive hover:bg-destructive/20" aria-label="Reject match">
                         <XCircle className="h-4 w-4" />
                       </button>
-                      <button type="button" className="rounded-xl bg-blue-50 p-2 text-blue-700 hover:bg-blue-100" aria-label="Send to CA">
+                      <button type="button" className="fv-status-review rounded-xl p-2 hover:opacity-85" aria-label="Send to CA">
                         <Send className="h-4 w-4" />
                       </button>
                     </>
@@ -171,9 +171,9 @@ export default function ReconciliationPage() {
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center justify-between"><span className="text-muted-foreground">Confidence</span><ConfidenceBar score={match.confidenceScore} /></div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <span className="rounded-lg bg-emerald-50 px-2 py-1 font-medium text-emerald-700">Amount match</span>
-                      <span className="rounded-lg bg-blue-50 px-2 py-1 font-medium text-blue-700">Date proximity</span>
-                      <span className="rounded-lg bg-amber-50 px-2 py-1 font-medium text-amber-700">Name similarity</span>
+                      <span className="fv-status-verified rounded-lg px-2 py-1 font-medium">Amount match</span>
+                      <span className="fv-status-review rounded-lg px-2 py-1 font-medium">Date proximity</span>
+                      <span className="fv-status-missing rounded-lg px-2 py-1 font-medium">Name similarity</span>
                       <span className="rounded-lg bg-muted px-2 py-1 font-medium text-muted-foreground">UTR/reference</span>
                     </div>
                   </div>

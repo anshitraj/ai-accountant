@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Building2, Bell, Shield, Users, Save, Database, FileText, History } from "lucide-react";
+import { Building2, Bell, Shield, Users, Save, Database, FileText, History, Trash2, Cpu } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
 import { useToast } from "@/hooks/use-toast";
 import { getUser } from "@/lib/auth";
@@ -39,12 +39,29 @@ interface SecurityPosture {
   auditLogsEnabled: boolean;
   fileStorageMode: string;
   aiMode: string;
+  aiProviderStatus?: {
+    gemini: "configured" | "missing";
+    nvidia: "configured" | "missing";
+    openrouter: "disabled" | "configured" | "missing";
+    currentPrimaryModel: string;
+    ruleBasedFallbackActive: boolean;
+  };
   directIntegrationsLive: boolean;
   notes: string[];
 }
 
+interface CompanyRecord {
+  name: string;
+  gstin?: string | null;
+  pan?: string | null;
+  caEmail?: string | null;
+  financialYearStart: string;
+  dataRetentionDays: number;
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
+  const qc = useQueryClient();
   const user = getUser();
   const { data: team = [] } = useQuery<PlatformUser[]>({
     queryKey: ["platformUsers"],
@@ -62,18 +79,34 @@ export default function SettingsPage() {
     queryKey: ["securityPosture"],
     queryFn: () => fetch(`${BASE}/api/security/posture`).then(r => r.json()),
   });
+  const { data: companyRecord } = useQuery<CompanyRecord | null>({
+    queryKey: ["company"],
+    queryFn: () => fetch(`${BASE}/api/company`).then(r => r.json()),
+  });
 
   const [company, setCompany] = useState({
-    name: "NovaStack Labs Pvt Ltd",
-    gstin: "29AAHCN0094Q1ZF",
-    pan: "AAHCN0094Q",
+    name: user?.company ?? "",
+    gstin: "",
+    pan: "",
     cin: "U72900KA2022PTC160000",
     financialYearStart: "April",
     state: "Karnataka",
     city: "Bengaluru",
-    caName: "CA Priya Sharma",
-    caEmail: "ca@finverify.in",
+    caName: "",
+    caEmail: "",
   });
+
+  useEffect(() => {
+    if (!companyRecord) return;
+    setCompany(current => ({
+      ...current,
+      name: companyRecord.name ?? current.name,
+      gstin: companyRecord.gstin ?? "",
+      pan: companyRecord.pan ?? "",
+      financialYearStart: companyRecord.financialYearStart ?? current.financialYearStart,
+      caEmail: companyRecord.caEmail ?? "",
+    }));
+  }, [companyRecord]);
 
   const [notifications, setNotifications] = useState({
     riskAlerts: true,
@@ -85,6 +118,22 @@ export default function SettingsPage() {
   const handleSave = () => {
     toast({ title: "Settings saved", description: "Your preferences have been updated." });
   };
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: (id: number) => fetch(`${BASE}/api/documents/${id}`, { method: "DELETE" }).then(async response => {
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      qc.invalidateQueries({ queryKey: ["auditLogs"] });
+      qc.invalidateQueries({ queryKey: ["securityPosture"] });
+      toast({ title: "Document deleted", description: "Storage object was deleted when configured, and the document was audit logged." });
+    },
+    onError: () => {
+      toast({ title: "Delete failed", description: "Could not delete the document.", variant: "destructive" });
+    },
+  });
 
   const sections = [
     {
@@ -141,10 +190,7 @@ export default function SettingsPage() {
       label: "Team Members & Role Permissions",
       content: (
         <div className="space-y-3">
-          {(team.length ? team : [
-            { id: 1, name: "Rahul Mehta", email: "rahul@novastack.in", role: "founder", status: "active" },
-            { id: 2, name: "CA Priya Sharma", email: "ca@finverify.in", role: "ca", status: "active" },
-          ]).map(member => (
+          {team.map(member => (
             <div key={member.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
               <div>
                 <div className="text-sm font-medium">{member.name}</div>
@@ -156,7 +202,7 @@ export default function SettingsPage() {
               </div>
             </div>
           ))}
-          <p className="text-xs text-muted-foreground">Role model is persisted for platform design; demo auth is still localStorage-based.</p>
+          {team.length === 0 && <p className="text-xs text-muted-foreground">No team members found for this workspace.</p>}
         </div>
       ),
     },
@@ -246,6 +292,33 @@ export default function SettingsPage() {
       ),
     },
     {
+      id: "ai",
+      icon: Cpu,
+      label: "AI Status",
+      content: (
+        <div className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-3">
+            {[
+              { label: "Gemini", value: security?.aiProviderStatus?.gemini ?? "missing" },
+              { label: "NVIDIA", value: security?.aiProviderStatus?.nvidia ?? "missing" },
+              { label: "OpenRouter", value: security?.aiProviderStatus?.openrouter ?? "disabled" },
+              { label: "Primary model", value: security?.aiProviderStatus?.currentPrimaryModel ?? "gemini-2.5-flash" },
+              { label: "Fallback", value: security?.aiProviderStatus?.ruleBasedFallbackActive ? "Rule-based mode active" : "Primary only" },
+              { label: "Output status", value: "AI suggested / pending review" },
+            ].map(item => (
+              <div key={item.label} className="p-3 rounded-lg border border-border bg-background">
+                <div className="text-xs text-muted-foreground">{item.label}</div>
+                <div className="text-sm font-semibold capitalize">{item.value}</div>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+            AI-assisted outputs are suggestions only. Source: AI suggestion. Source: deterministic rule. Potential risk — needs CA review.
+          </div>
+        </div>
+      ),
+    },
+    {
       id: "data",
       icon: Database,
       label: "Data Store & Documents",
@@ -258,7 +331,7 @@ export default function SettingsPage() {
             </div>
             <div className="p-3 rounded-lg border border-border bg-background">
               <div className="text-xs text-muted-foreground">Storage mode</div>
-              <div className="text-sm font-semibold">Metadata only</div>
+              <div className="text-sm font-semibold">{security?.fileStorageMode === "metadata_only" ? "Metadata only" : "Private R2"}</div>
             </div>
             <div className="p-3 rounded-lg border border-border bg-background">
               <div className="text-xs text-muted-foreground">Retention</div>
@@ -269,10 +342,23 @@ export default function SettingsPage() {
             {(documents.length ? documents.slice(0, 5) : []).map(document => (
               <div key={document.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
                 <span className="flex items-center gap-2"><FileText className="w-3.5 h-3.5 text-primary" />{document.fileName}</span>
-                <span className="text-xs text-muted-foreground">{document.sourceType} / {document.status}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{document.sourceType} / {document.status}</span>
+                  {document.status !== "deleted" && (
+                    <button
+                      type="button"
+                      onClick={() => deleteDocumentMutation.mutate(document.id)}
+                      disabled={deleteDocumentMutation.isPending}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-700"
+                      aria-label={`Delete ${document.fileName}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </span>
               </div>
             ))}
-            {documents.length === 0 && <p className="text-xs text-muted-foreground">Seed demo data or upload a file to create document metadata records.</p>}
+            {documents.length === 0 && <p className="text-xs text-muted-foreground">Upload a file to create document metadata records.</p>}
           </div>
         </div>
       ),
@@ -292,7 +378,7 @@ export default function SettingsPage() {
               <div className="text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString("en-IN")}</div>
             </div>
           ))}
-          {auditLogs.length === 0 && <p className="text-xs text-muted-foreground">Audit logging is implemented. Seed demo data or upload files to see events.</p>}
+          {auditLogs.length === 0 && <p className="text-xs text-muted-foreground">Audit logs will appear after sign-ins, uploads, exports, and review actions.</p>}
         </div>
       ),
     },

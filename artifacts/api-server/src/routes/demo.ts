@@ -5,6 +5,11 @@ import { SeedDemoDataResponse } from "@workspace/api-zod";
 const router: IRouter = Router();
 
 router.post("/demo/seed", async (req, res): Promise<void> => {
+  if (process.env.ALLOW_DEMO_SEED !== "true") {
+    res.status(403).json({ error: "Demo seeding is disabled. Set ALLOW_DEMO_SEED=true to enable it explicitly." });
+    return;
+  }
+
   try {
     const counts = await seedDemoData();
     res.json(SeedDemoDataResponse.parse({

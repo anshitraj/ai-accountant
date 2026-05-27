@@ -78,20 +78,20 @@ export default function InvoicesPage() {
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="fv-search-field flex-1 min-w-48">
+          <Search className="fv-search-icon" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search invoice number, vendor, GSTIN…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="fv-search-input"
           />
         </div>
         <select
           value={type}
           onChange={e => setType(e.target.value)}
-          className="px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+          className="fv-input"
         >
           <option value="all">All Types</option>
           <option value="purchase">Purchase</option>
@@ -100,7 +100,7 @@ export default function InvoicesPage() {
         <select
           value={status}
           onChange={e => setStatus(e.target.value)}
-          className="px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+          className="fv-input"
         >
           <option value="all">All Statuses</option>
           <option value="verified">Verified</option>
@@ -148,14 +148,14 @@ export default function InvoicesPage() {
                     <div className="font-medium">{inv.vendorName}</div>
                     {inv.customerName && <div className="text-xs text-muted-foreground">to {inv.customerName}</div>}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{inv.gstin || <span className="text-amber-600">Missing</span>}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{inv.gstin || <span className="fv-text-brand-accent">Missing</span>}</td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatDate(inv.date)}</td>
                   <td className="px-4 py-3 text-right font-mono font-semibold">{formatCurrencyFull(inv.amount)}</td>
                   <td className="px-4 py-3 text-right font-mono text-muted-foreground text-xs">
                     {inv.gstAmount ? formatCurrencyFull(inv.gstAmount) : "—"}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${inv.type === "purchase" ? "bg-blue-50 text-blue-700" : "bg-green-50 text-green-700"}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${inv.type === "purchase" ? "fv-status-review" : "fv-status-verified"}`}>
                       {inv.type}
                     </span>
                   </td>

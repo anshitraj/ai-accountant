@@ -1,114 +1,145 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { CheckCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, CheckCircle, Chrome, Database, Eye, EyeOff, Github, Loader2 } from "lucide-react";
 import { login } from "@/lib/auth";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-const DEMO_ACCOUNTS = [
-  {
-    email: "rahul@novastack.in",
-    password: "demo1234",
-    name: "Rahul Mehta",
-    role: "founder" as const,
-    company: "NovaStack Labs Pvt Ltd",
-    label: "Founder View",
-    desc: "Full dashboard, upload center, overview",
-  },
-  {
-    email: "ca@finverify.in",
-    password: "demo1234",
-    name: "CA Priya Sharma",
-    role: "ca" as const,
-    company: "NovaStack Labs Pvt Ltd",
-    label: "CA View",
-    desc: "Review queue, flags, reports",
-  },
-];
+type AuthMode = "signin" | "register";
+
+interface AuthResponse {
+  token: string;
+  expiresAt: string;
+  user: {
+    id: number;
+    email: string;
+    name: string;
+    role: "founder" | "admin" | "ca";
+    company: string;
+    companyId: number | null;
+  };
+}
+
+function nextRouteFor(email: string) {
+  return localStorage.getItem(`finverify_onboarding_complete:${email}`) === "true" ? "/app/overview" : "/onboarding";
+}
+
+async function readAuthResponse(response: Response): Promise<AuthResponse> {
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.error || "Authentication failed");
+  }
+  return data;
+}
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
+  const [mode, setMode] = useState<AuthMode>("signin");
+  const [name, setName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState("");
+  const initialError = new URLSearchParams(window.location.search).get("error");
+  const [error, setError] = useState(initialError ? "OAuth sign-in could not be completed. Please try again." : "");
+  const [submitting, setSubmitting] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
-  const persistLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
+
     try {
-      const res = await fetch(`${BASE}/api/auth/login`, {
+      const endpoint = mode === "register" ? "/api/auth/register" : "/api/auth/login";
+      const body = mode === "register"
+        ? { name, companyName, email, password }
+        : { email, password };
+      const data = await fetch(`${BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: account.email, password: account.password }),
-      });
-      if (!res.ok) throw new Error("Database-backed demo login failed");
-      const data = await res.json();
+        body: JSON.stringify(body),
+      }).then(readAuthResponse);
+
       login({
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role,
-        company: data.user.company,
-        companyId: data.user.companyId,
+        token: data.token,
+        expiresAt: data.expiresAt,
+        user: data.user,
       });
-    } catch {
-      login({ email: account.email, name: account.name, role: account.role, company: account.company });
+      navigate(mode === "register" ? "/onboarding" : nextRouteFor(data.user.email));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const account = DEMO_ACCOUNTS.find(a => a.email === email && a.password === password);
-    if (!account) {
-      setError("Invalid credentials. Use a demo account below.");
-      return;
-    }
-    await persistLogin(account);
-    navigate("/app/overview");
+  const isRegister = mode === "register";
+  const startOAuth = (provider: "google" | "github") => {
+    const returnTo = encodeURIComponent(isRegister ? "/onboarding" : "/app/overview");
+    window.location.href = `${BASE}/api/auth/${provider}?returnTo=${returnTo}`;
   };
 
-  const quickLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
-    await persistLogin(account);
-    navigate("/app/overview");
+  const handleDemoLoad = async () => {
+    setError("");
+    setDemoLoading(true);
+    try {
+      const data = await fetch(`${BASE}/api/auth/demo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intent: "load_demo_workspace" }),
+      }).then(readAuthResponse);
+
+      login({
+        token: data.token,
+        expiresAt: data.expiresAt,
+        user: data.user,
+      });
+      localStorage.setItem(`finverify_onboarding_complete:${data.user.email}`, "true");
+      navigate("/app/overview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Demo workspace could not be loaded");
+    } finally {
+      setDemoLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-foreground p-12 flex-col justify-between">
+      <div className="fv-brand-primary-bg hidden lg:flex lg:w-1/2 p-12 flex-col justify-between">
         <div>
           <div className="flex items-center gap-2 mb-12">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+            <div className="fv-brand-accent-bg w-7 h-7 rounded-lg flex items-center justify-center">
               <CheckCircle className="w-4 h-4 text-white" />
             </div>
             <span className="font-semibold text-white">FinVerify OS</span>
           </div>
           <h2 className="text-3xl font-bold text-white mb-4 leading-tight">
-            Your CA-ready<br />finance dashboard
+            Your real finance data,<br />verified before CA review
           </h2>
           <p className="text-white/60 text-sm">
-            Reconcile transactions, flag GST/TDS risks, and close books faster — all before your CA opens the file.
+            Create your workspace, upload statements and exports, and review only the records stored in your database.
           </p>
         </div>
         <div className="space-y-4">
           {[
-            "Auto-reconciliation with confidence scoring",
-            "GST & TDS risk detection",
-            "Structured CA review queue",
-            "Audit-ready report export",
+            "Upload-based verification from your files",
+            "Database-backed users and sessions",
+            "Rule-first reconciliation and risk checks",
+            "Demo data loads only when you ask for it",
           ].map(item => (
             <div key={item} className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="w-3 h-3 text-primary" />
+              <div className="w-5 h-5 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
+                <CheckCircle className="fv-text-brand-accent w-3 h-3" />
               </div>
               <span className="text-white/80 text-sm">{item}</span>
             </div>
           ))}
         </div>
-        <p className="text-white/30 text-xs">© 2026 FinVerify OS. Built for Indian startups.</p>
+        <p className="text-white/30 text-xs">(c) 2026 FinVerify OS. Upload-based finance verification.</p>
       </div>
 
-      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -124,50 +155,99 @@ export default function LoginPage() {
           </button>
 
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+            <div className="fv-brand-icon w-7 h-7 rounded-lg flex items-center justify-center">
               <CheckCircle className="w-4 h-4 text-white" />
             </div>
             <span className="font-semibold">FinVerify OS</span>
           </div>
 
-          <h1 className="text-2xl font-bold mb-1">Sign in</h1>
-          <p className="text-muted-foreground text-sm mb-8">Access your NovaStack Labs workspace</p>
+          <h1 className="text-2xl font-bold mb-1">{isRegister ? "Create workspace" : "Sign in"}</h1>
+          <p className="text-muted-foreground text-sm mb-6">
+            {isRegister ? "Start with an empty database-backed workspace." : "Access your database-backed workspace."}
+          </p>
 
-          {/* Demo quick login */}
-          <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-            <p className="text-xs font-semibold text-primary mb-3 uppercase tracking-wide">Demo Accounts</p>
-            <div className="space-y-2">
-              {DEMO_ACCOUNTS.map(account => (
-                <button
-                  key={account.email}
-                  onClick={() => quickLogin(account)}
-                  className="w-full flex items-center justify-between p-3 bg-card border border-border rounded-lg hover:border-primary/40 hover:bg-primary/5 transition-colors text-left"
-                >
-                  <div>
-                    <div className="text-sm font-medium">{account.label}</div>
-                    <div className="text-xs text-muted-foreground">{account.desc}</div>
-                  </div>
-                  <div className="text-xs text-muted-foreground font-mono">{account.email}</div>
-                </button>
-              ))}
-            </div>
+          <div className="mb-6 grid grid-cols-2 rounded-xl border border-border bg-muted/40 p-1">
+            {[
+              { id: "signin" as const, label: "Sign in" },
+              { id: "register" as const, label: "Create" },
+            ].map(item => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setMode(item.id);
+                  setError("");
+                }}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  mode === item.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
 
-          <div className="flex items-center gap-3 mb-6">
+          <div className="mb-5 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => startOAuth("google")}
+              className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-semibold hover:bg-muted/40 transition-colors"
+            >
+              <Chrome className="h-4 w-4" />
+              Google
+            </button>
+            <button
+              type="button"
+              onClick={() => startOAuth("github")}
+              className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-semibold hover:bg-muted/40 transition-colors"
+            >
+              <Github className="h-4 w-4" />
+              GitHub
+            </button>
+          </div>
+
+          <div className="mb-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">or sign in manually</span>
+            <span className="text-xs text-muted-foreground">or use email</span>
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {isRegister && (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Your name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Aarav Sharma"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Company name</label>
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={e => setCompanyName(e.target.value)}
+                    placeholder="Your startup Pvt Ltd"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                    required
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label className="text-sm font-medium mb-1.5 block">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="rahul@novastack.in"
+                placeholder="you@company.com"
                 className="w-full px-3 py-2.5 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                required
               />
             </div>
             <div>
@@ -177,13 +257,16 @@ export default function LoginPage() {
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="demo1234"
+                  placeholder={isRegister ? "At least 8 characters" : "Your password"}
+                  minLength={isRegister ? 8 : undefined}
                   className="w-full px-3 py-2.5 pr-10 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                  required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPw ? "Hide password" : "Show password"}
                 >
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -194,11 +277,38 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 transition-colors text-sm"
+              disabled={submitting || demoLoading}
+              className="fv-brand-accent-bg w-full py-2.5 font-semibold rounded-lg transition-colors text-sm disabled:opacity-60"
             >
-              Sign in
+              {submitting ? "Working..." : isRegister ? "Create workspace" : "Sign in"}
             </button>
           </form>
+
+          <div className="mt-5 rounded-xl border border-border bg-card p-4">
+            <div className="mb-3 flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Database className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Need test data?</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  Load NovaStack sample finance records to test uploads, reconciliation, invoices, ledgers, GST/TDS risks, payroll, gateway settlements, CA review, reports, and settings.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleDemoLoad}
+              disabled={submitting || demoLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-semibold transition-colors hover:bg-muted/50 disabled:opacity-60"
+            >
+              {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+              {demoLoading ? "Loading demo workspace..." : "Load demo workspace"}
+            </button>
+            <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+              This intentionally seeds sample records. Real signup still starts empty.
+            </p>
+          </div>
         </motion.div>
       </div>
     </div>

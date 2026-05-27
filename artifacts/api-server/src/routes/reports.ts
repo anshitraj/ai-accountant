@@ -7,6 +7,8 @@ import {
   payrollEntriesTable,
   gatewaySettlementsTable,
   caReviewItemsTable,
+  companiesTable,
+  documentsTable,
   reconciliationMatchesTable,
 } from "@workspace/db";
 import { and, eq, desc } from "drizzle-orm";
@@ -19,11 +21,25 @@ import {
   ProcessCaReviewItemResponse,
 } from "@workspace/api-zod";
 import { auditAction, getCompanyId, requirePermission } from "../middleware/authz";
+import { retentionUntil, storeUploadedFile } from "../services/storage";
 
 const router: IRouter = Router();
 
+function toCsv(data: Record<string, unknown>[]): string {
+  if (!data.length) return "";
+  const headers = Object.keys(data[0]);
+  const rows = data.map(row => headers.map(header => {
+    const value = row[header];
+    if (value === null || value === undefined) return "";
+    const str = String(value);
+    return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  }).join(","));
+  return [headers.join(","), ...rows].join("\n");
+}
+
 router.get("/reports/summary", requirePermission("reports.read"), async (req, res): Promise<void> => {
   const companyId = getCompanyId(req);
+  const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId)).limit(1);
   const txns = await db.select().from(bankTransactionsTable).where(eq(bankTransactionsTable.companyId, companyId));
   const invoices = await db.select().from(invoicesTable).where(eq(invoicesTable.companyId, companyId));
   const risks = await db.select().from(riskFlagsTable).where(and(eq(riskFlagsTable.companyId, companyId), eq(riskFlagsTable.status, "open")));
@@ -39,8 +55,8 @@ router.get("/reports/summary", requirePermission("reports.read"), async (req, re
   const totalGateway = settlements.reduce((sum, s) => sum + parseFloat(s.netAmount as string), 0);
 
   res.json(GetReportSummaryResponse.parse({
-    companyName: "NovaStack Labs Pvt Ltd",
-    month: "May 2026",
+    companyName: company?.name ?? "Current workspace",
+    month: new Date().toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" }),
     verificationScore: score,
     caReadyStatus: caReady,
     generatedAt: new Date().toISOString(),
@@ -131,13 +147,62 @@ router.get("/reports/export-csv", requirePermission("reports.export"), async (re
     rowCount = data.length;
   }
 
-  await auditAction(req, "report.exported", "report", null, { type, rowCount });
-  res.json(ExportReportCsvResponse.parse({
+  let storedExport: null | {
+    documentId: number;
+    storageProvider: string;
+    storageKey: string | null;
+    checksumSha256: string | null;
+    sizeBytes: number | null;
+  } = null;
+
+  if (req.query.store === "true") {
+    const fileName = `${type}_report_${new Date().toISOString().slice(0, 10)}.csv`;
+    const csv = toCsv(data);
+    const file = {
+      buffer: Buffer.from(csv, "utf8"),
+      originalname: fileName,
+      mimetype: "text/csv",
+      size: Buffer.byteLength(csv, "utf8"),
+    };
+    const stored = await storeUploadedFile({ companyId, sourceType: "export", file });
+    const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId)).limit(1);
+    const [document] = await db.insert(documentsTable).values({
+      companyId,
+      uploadBatchId: null,
+      fileName,
+      sourceType: "export",
+      mimeType: "text/csv",
+      storageProvider: stored.provider,
+      storageBucket: stored.bucket,
+      storageRegion: stored.region,
+      storageKey: stored.key,
+      storageUrl: stored.url,
+      sizeBytes: stored.sizeBytes,
+      checksumSha256: stored.checksumSha256,
+      status: "exported",
+      extractedTextStatus: "not_required",
+      rowCount,
+      detectedColumns: { type, columns: data.length ? Object.keys(data[0]) : [] },
+      uploadedByUserId: req.auth?.userId ?? null,
+      retentionUntil: retentionUntil(company?.dataRetentionDays),
+    }).returning();
+    storedExport = {
+      documentId: document.id,
+      storageProvider: document.storageProvider,
+      storageKey: document.storageKey,
+      checksumSha256: document.checksumSha256,
+      sizeBytes: document.sizeBytes,
+    };
+  }
+
+  await auditAction(req, "report.exported", "report", null, { type, rowCount, stored: Boolean(storedExport) });
+  const payload = ExportReportCsvResponse.parse({
     success: true,
     message: `Exported ${rowCount} ${type} records`,
     rowCount,
     data,
-  }));
+  });
+  res.json({ ...payload, storedExport });
 });
 
 router.get("/ca-review", requirePermission("reports.read"), async (req, res): Promise<void> => {

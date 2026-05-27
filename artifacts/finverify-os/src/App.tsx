@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
+import OnboardingPage from "@/pages/onboarding";
 import AppShell from "@/components/app/AppShell";
 import OverviewPage from "@/pages/app/overview";
 import UploadsPage from "@/pages/app/uploads";
@@ -18,6 +19,7 @@ import GatewaySettlementsPage from "@/pages/app/gateway-settlements";
 import CaReviewPage from "@/pages/app/ca-review";
 import ReportsPage from "@/pages/app/reports";
 import IntegrationsPage from "@/pages/app/integrations";
+import AdminPage from "@/pages/app/admin";
 import SettingsPage from "@/pages/app/settings";
 
 const queryClient = new QueryClient({
@@ -51,6 +53,7 @@ const GatewaySettlementsWithShell = withShell(GatewaySettlementsPage);
 const CaReviewWithShell = withShell(CaReviewPage);
 const ReportsWithShell = withShell(ReportsPage);
 const IntegrationsWithShell = withShell(IntegrationsPage);
+const AdminWithShell = withShell(AdminPage);
 const SettingsWithShell = withShell(SettingsPage);
 
 function AppRouter() {
@@ -58,6 +61,7 @@ function AppRouter() {
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/onboarding" component={OnboardingPage} />
       <Route path="/app" component={OverviewWithShell} />
       <Route path="/app/overview" component={OverviewWithShell} />
       <Route path="/app/uploads" component={UploadsWithShell} />
@@ -71,6 +75,7 @@ function AppRouter() {
       <Route path="/app/ca-review" component={CaReviewWithShell} />
       <Route path="/app/reports" component={ReportsWithShell} />
       <Route path="/app/integrations" component={IntegrationsWithShell} />
+      <Route path="/app/admin" component={AdminWithShell} />
       <Route path="/app/settings" component={SettingsWithShell} />
       <Route component={NotFound} />
     </Switch>

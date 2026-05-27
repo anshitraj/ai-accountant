@@ -1,16 +1,36 @@
 import { Router, type IRouter } from "express";
-import { HealthCheckResponse } from "@workspace/api-zod";
+import { getAIStatus } from "../server/ai/providerRouter";
+import { validateDatabaseConnection } from "../server/db";
+import { validateR2Connection } from "../server/storage/r2Client";
 
 const router: IRouter = Router();
 
-router.get("/healthz", (_req, res) => {
-  const data = HealthCheckResponse.parse({ status: "ok" });
-  res.json(data);
+async function healthPayload() {
+  const [db, r2] = await Promise.all([
+    validateDatabaseConnection(),
+    validateR2Connection(),
+  ]);
+  const ai = getAIStatus();
+  return {
+    ok: db === "ok",
+    db,
+    r2,
+    ai: {
+      gemini: ai.gemini,
+      nvidia: ai.nvidia,
+      openrouter: ai.openrouter,
+    },
+  };
+}
+
+router.get("/healthz", async (_req, res) => {
+  const data = await healthPayload();
+  res.status(data.ok ? 200 : 503).json(data);
 });
 
-router.get("/health", (_req, res) => {
-  const data = HealthCheckResponse.parse({ status: "ok" });
-  res.json(data);
+router.get("/health", async (_req, res) => {
+  const data = await healthPayload();
+  res.status(data.ok ? 200 : 503).json(data);
 });
 
 export default router;

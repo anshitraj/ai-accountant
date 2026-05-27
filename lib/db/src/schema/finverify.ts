@@ -21,10 +21,37 @@ export const usersTable = pgTable("users", {
   companyId: integer("company_id"),
   name: text("name").notNull(),
   email: text("email").notNull(),
+  passwordHash: text("password_hash"),
+  passwordSalt: text("password_salt"),
   role: text("role").notNull().default("founder"),
   status: text("status").notNull().default("active"),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const authSessionsTable = pgTable("auth_sessions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  companyId: integer("company_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
+  expiresAt: timestamp("expires_at").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const oauthAccountsTable = pgTable("oauth_accounts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  companyId: integer("company_id").notNull(),
+  provider: text("provider").notNull(),
+  providerUserId: text("provider_user_id").notNull(),
+  email: text("email").notNull(),
+  name: text("name"),
+  avatarUrl: text("avatar_url"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastLoginAt: timestamp("last_login_at"),
 });
 
 export const rolePermissionsTable = pgTable("role_permissions", {
@@ -55,11 +82,19 @@ export const documentsTable = pgTable("documents", {
   mimeType: text("mime_type"),
   storageProvider: text("storage_provider").notNull().default("metadata_only"),
   storageKey: text("storage_key"),
+  storageBucket: text("storage_bucket"),
+  storageRegion: text("storage_region"),
+  storageUrl: text("storage_url"),
+  sizeBytes: integer("size_bytes"),
+  checksumSha256: text("checksum_sha256"),
   status: text("status").notNull().default("metadata_captured"),
   extractedTextStatus: text("extracted_text_status").notNull().default("not_started"),
   rowCount: integer("row_count"),
   detectedColumns: jsonb("detected_columns"),
   uploadedByUserId: integer("uploaded_by_user_id"),
+  retentionUntil: timestamp("retention_until"),
+  deletedAt: timestamp("deleted_at"),
+  deletedByUserId: integer("deleted_by_user_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -149,6 +184,8 @@ export const reconciliationMatchesTable = pgTable("reconciliation_matches", {
   matchType: text("match_type").notNull(),
   confidenceScore: integer("confidence_score").notNull().default(0),
   reason: text("reason").notNull(),
+  reasonJson: jsonb("reason_json"),
+  evidenceJson: jsonb("evidence_json"),
   status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -195,23 +232,181 @@ export const auditLogsTable = pgTable("audit_logs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const aiUsageLogsTable = pgTable("ai_usage_logs", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id"),
+  userId: integer("user_id"),
+  provider: text("provider").notNull(),
+  model: text("model"),
+  purpose: text("purpose").notNull(),
+  success: boolean("success").notNull().default(false),
+  latencyMs: integer("latency_ms").notNull().default(0),
+  tokenEstimate: integer("token_estimate"),
+  usedFallback: boolean("used_fallback").notNull().default(false),
+  errorCode: text("error_code"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const aiExtractionsTable = pgTable("ai_extractions", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id"),
+  uploadId: integer("upload_id"),
+  entityType: text("entity_type").notNull(),
+  entityId: integer("entity_id"),
+  provider: text("provider").notNull(),
+  model: text("model"),
+  purpose: text("purpose").notNull(),
+  extractedJson: jsonb("extracted_json").notNull(),
+  confidence: numeric("confidence", { precision: 5, scale: 4 }).notNull().default("0"),
+  status: text("status").notNull().default("extracted_pending_review"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const aiProviderSettingsTable = pgTable("ai_provider_settings", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id"),
+  geminiModel: text("gemini_model"),
+  geminiFallbackModel: text("gemini_fallback_model"),
+  nvidiaModel: text("nvidia_model"),
+  openrouterModel: text("openrouter_model"),
+  openrouterEnabled: boolean("openrouter_enabled").notNull().default(false),
+  providerOrder: jsonb("provider_order"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const fileUploadsTable = pgTable("file_uploads", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id"),
+  userId: integer("user_id"),
+  sourceType: text("source_type").notNull(),
+  originalFileName: text("original_file_name").notNull(),
+  mimeType: text("mime_type"),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  r2Key: text("r2_key"),
+  encrypted: boolean("encrypted").notNull().default(true),
+  encryptionVersion: text("encryption_version").notNull().default("r2-managed"),
+  status: text("status").notNull().default("stored"),
+  parsedRowCount: integer("parsed_row_count"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const fileAccessLogsTable = pgTable("file_access_logs", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id"),
+  userId: integer("user_id"),
+  fileUploadId: integer("file_upload_id"),
+  r2Key: text("r2_key"),
+  action: text("action").notNull(),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const caReviewItemsTable = pgTable("ca_review_items", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id"),
+  monthlyClosePeriodId: integer("monthly_close_period_id"),
+  exceptionId: integer("exception_id"),
   entityType: text("entity_type").notNull(),
   entityId: integer("entity_id"),
   title: text("title").notNull(),
   description: text("description"),
   severity: text("severity").notNull().default("medium"),
   status: text("status").notNull().default("pending"),
+  assignedTo: integer("assigned_to"),
   founderNote: text("founder_note"),
   caNote: text("ca_note"),
+  requestedDocumentsJson: jsonb("requested_documents_json"),
+  evidenceJson: jsonb("evidence_json"),
+  createdBy: integer("created_by"),
+  resolvedBy: integer("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const monthlyClosePeriodsTable = pgTable("monthly_close_periods", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+  status: text("status").notNull().default("open"),
+  verificationScore: integer("verification_score").notNull().default(0),
+  verifiedAmount: numeric("verified_amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  unverifiedAmount: numeric("unverified_amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  missingDocumentsCount: integer("missing_documents_count").notNull().default(0),
+  riskFlagsCount: integer("risk_flags_count").notNull().default(0),
+  caReviewItemsCount: integer("ca_review_items_count").notNull().default(0),
+  uploadedSourcesJson: jsonb("uploaded_sources_json"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const evidenceItemsTable = pgTable("evidence_items", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: integer("entity_id").notNull(),
+  uploadId: integer("upload_id"),
+  sourceType: text("source_type"),
+  sourceFileName: text("source_file_name"),
+  sourcePage: integer("source_page"),
+  sourceRowNumber: integer("source_row_number"),
+  sourceTextSnippet: text("source_text_snippet"),
+  sourceJson: jsonb("source_json"),
+  confidence: numeric("confidence", { precision: 5, scale: 4 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const documentRequestsTable = pgTable("document_requests", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  monthlyClosePeriodId: integer("monthly_close_period_id"),
+  requestedBy: integer("requested_by"),
+  assignedTo: integer("assigned_to"),
+  relatedEntityType: text("related_entity_type"),
+  relatedEntityId: integer("related_entity_id"),
+  title: text("title").notNull(),
+  description: text("description"),
+  requiredDocumentType: text("required_document_type").notNull().default("other"),
+  status: text("status").notNull().default("open"),
+  priority: text("priority").notNull().default("medium"),
+  dueDate: timestamp("due_date"),
+  uploadedFileId: integer("uploaded_file_id"),
+  caComment: text("ca_comment"),
+  founderComment: text("founder_comment"),
+  resolvedBy: integer("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const exceptionsTable = pgTable("exceptions", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  monthlyClosePeriodId: integer("monthly_close_period_id"),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  severity: text("severity").notNull().default("medium"),
+  status: text("status").notNull().default("open"),
+  relatedEntityType: text("related_entity_type"),
+  relatedEntityId: integer("related_entity_id"),
+  assignedTo: integer("assigned_to"),
+  createdBy: integer("created_by"),
+  resolvedBy: integer("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNote: text("resolution_note"),
+  evidenceJson: jsonb("evidence_json"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertUploadBatchSchema = createInsertSchema(uploadBatchesTable).omit({ id: true, uploadedAt: true });
 export const insertCompanySchema = createInsertSchema(companiesTable).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });
+export const insertAuthSessionSchema = createInsertSchema(authSessionsTable).omit({ id: true, createdAt: true });
+export const insertOauthAccountSchema = createInsertSchema(oauthAccountsTable).omit({ id: true, createdAt: true });
 export const insertRolePermissionSchema = createInsertSchema(rolePermissionsTable).omit({ id: true, createdAt: true });
 export const insertDocumentSchema = createInsertSchema(documentsTable).omit({ id: true, createdAt: true });
 export const insertBankTransactionSchema = createInsertSchema(bankTransactionsTable).omit({ id: true, createdAt: true });
@@ -224,10 +419,21 @@ export const insertRiskFlagSchema = createInsertSchema(riskFlagsTable).omit({ id
 export const insertCaReviewItemSchema = createInsertSchema(caReviewItemsTable).omit({ id: true, createdAt: true });
 export const insertGstRecordSchema = createInsertSchema(gstRecordsTable).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogsTable).omit({ id: true, createdAt: true });
+export const insertAiUsageLogSchema = createInsertSchema(aiUsageLogsTable).omit({ id: true, createdAt: true });
+export const insertAiExtractionSchema = createInsertSchema(aiExtractionsTable).omit({ id: true, createdAt: true });
+export const insertAiProviderSettingSchema = createInsertSchema(aiProviderSettingsTable).omit({ id: true, createdAt: true });
+export const insertFileUploadSchema = createInsertSchema(fileUploadsTable).omit({ id: true, createdAt: true });
+export const insertFileAccessLogSchema = createInsertSchema(fileAccessLogsTable).omit({ id: true, createdAt: true });
+export const insertMonthlyClosePeriodSchema = createInsertSchema(monthlyClosePeriodsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEvidenceItemSchema = createInsertSchema(evidenceItemsTable).omit({ id: true, createdAt: true });
+export const insertDocumentRequestSchema = createInsertSchema(documentRequestsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertExceptionSchema = createInsertSchema(exceptionsTable).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type UploadBatch = typeof uploadBatchesTable.$inferSelect;
 export type Company = typeof companiesTable.$inferSelect;
 export type User = typeof usersTable.$inferSelect;
+export type AuthSession = typeof authSessionsTable.$inferSelect;
+export type OauthAccount = typeof oauthAccountsTable.$inferSelect;
 export type RolePermission = typeof rolePermissionsTable.$inferSelect;
 export type Document = typeof documentsTable.$inferSelect;
 export type BankTransaction = typeof bankTransactionsTable.$inferSelect;
@@ -240,3 +446,12 @@ export type RiskFlag = typeof riskFlagsTable.$inferSelect;
 export type CaReviewItem = typeof caReviewItemsTable.$inferSelect;
 export type GstRecord = typeof gstRecordsTable.$inferSelect;
 export type AuditLog = typeof auditLogsTable.$inferSelect;
+export type AiUsageLog = typeof aiUsageLogsTable.$inferSelect;
+export type AiExtraction = typeof aiExtractionsTable.$inferSelect;
+export type AiProviderSetting = typeof aiProviderSettingsTable.$inferSelect;
+export type FileUpload = typeof fileUploadsTable.$inferSelect;
+export type FileAccessLog = typeof fileAccessLogsTable.$inferSelect;
+export type MonthlyClosePeriod = typeof monthlyClosePeriodsTable.$inferSelect;
+export type EvidenceItem = typeof evidenceItemsTable.$inferSelect;
+export type DocumentRequest = typeof documentRequestsTable.$inferSelect;
+export type Exception = typeof exceptionsTable.$inferSelect;

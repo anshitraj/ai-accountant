@@ -1,5 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+@config "../tailwind.config.ts";
 @import "tailwindcss";
+@source "./**/*.{ts,tsx}";
+@source "../index.html";
+@source inline("block hidden flex inline-flex grid relative absolute fixed sticky inset-0 -inset-8 top-0 top-1/2 left-0 left-3 right-1.5 z-40 z-50 -z-10 mx-auto ml-1 ml-3 ml-auto mt-0.5 mt-1 mt-2 mt-3 mt-4 mt-5 mt-6 mt-7 mt-8 mt-auto mb-2 mb-3 mb-4 mb-5 mb-6 p-2 p-3 p-4 p-5 p-6 p-8 p-10 p-12 px-1.5 px-2 px-2.5 px-3 px-4 px-5 px-6 py-0.5 py-1 py-2 py-2.5 py-3 py-4 py-8 py-12 py-14 py-16 py-20 pb-20 h-1.5 h-2 h-2.5 h-3.5 h-4 h-5 h-6 h-8 h-9 h-10 h-11 h-12 h-16 h-20 h-32 h-full h-screen min-h-screen min-h-[calc(100vh-64px)] w-1 w-1.5 w-2.5 w-3.5 w-4 w-5 w-6 w-7 w-8 w-9 w-10 w-11 w-12 w-20 w-32 w-48 w-56 w-64 w-72 w-full max-w-xl max-w-2xl max-w-3xl max-w-4xl max-w-6xl max-w-7xl min-w-0 shrink-0 flex-1 flex-col flex-wrap items-center items-start items-end justify-center justify-between gap-2 gap-2.5 gap-3 gap-4 gap-5 gap-6 gap-7 gap-8 gap-10 grid-cols-2 grid-cols-[1fr_110px_130px] overflow-hidden overflow-y-auto truncate whitespace-nowrap text-left text-center text-right text-xs text-sm text-lg text-xl text-2xl text-3xl text-5xl text-[10px] text-[11px] font-normal font-medium font-semibold font-bold font-mono uppercase capitalize tracking-tight tracking-wide tracking-[0.16em] leading-none leading-5 leading-6 leading-8 leading-[1.05] text-foreground text-muted-foreground text-muted-foreground/70 text-primary text-primary-foreground text-white text-success text-warning text-destructive text-amber-700 text-amber-800 text-blue-700 text-emerald-700 text-red-700 bg-background bg-background/85 bg-card bg-card/80 bg-muted bg-muted/50 bg-muted/60 bg-primary bg-primary/10 bg-primary/15 bg-primary/20 bg-amber-50 bg-amber-300 bg-blue-50 bg-emerald-50 bg-emerald-300 bg-red-50 bg-red-300 bg-black/35 border border-b border-t border-r border-border border-primary/20 border-amber-200 border-blue-200 rounded-lg rounded-xl rounded-2xl rounded-full rounded-r-full rounded-[24px] rounded-[28px] rounded-[36px] shadow-sm shadow-[0_18px_60px_rgba(16,24,40,0.08)] shadow-[0_24px_80px_rgba(16,24,40,0.14)] backdrop-blur blur-3xl pointer-events-none cursor-pointer transition transition-all transition-colors -translate-y-1/2 -rotate-90 hover:bg-muted hover:text-foreground hover:border-primary/40 hover:-translate-y-0.5 hover:translate-y-0");
+@source inline("{sm:,md:,lg:}{block,hidden,flex,inline-flex,grid,flex-row,flex-col,items-center,items-start,items-end,justify-between,grid-cols-2,grid-cols-3,grid-cols-4,grid-cols-6,grid-cols-[0.8fr_1.2fr],grid-cols-[0.92fr_1.08fr],grid-cols-[1.2fr_0.8fr],py-20,p-6,p-12,px-5,text-3xl,text-4xl,text-6xl,w-56}");
 @import "tw-animate-css";
 @import "./styles/design-tokens.css";
 @plugin "@tailwindcss/typography";
@@ -79,67 +84,68 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  /* FAFAF7 */
-  --background: 72 20% 97%;
+  /* FAFAF9 */
+  --background: 60 9% 98%;
   /* 101828 */
   --foreground: 220 43% 11%;
   
-  /* E5E7EB */
-  --border: 220 13% 91%;
+  /* E7E5E4 */
+  --border: 20 6% 90%;
   
   /* FFFFFF */
   --card: 0 0% 100%;
   --card-foreground: 220 43% 11%;
-  --card-border: 220 13% 91%;
+  --card-border: 20 6% 90%;
 
-  --sidebar: 0 0% 100%;
-  --sidebar-foreground: 220 43% 11%;
-  --sidebar-border: 220 13% 91%;
-  --sidebar-primary: 16 88% 59%;
+  --sidebar: 160 88% 20%;
+  --sidebar-foreground: 60 9% 98%;
+  --sidebar-border: 162 47% 26%;
+  --sidebar-primary: 29 95% 50%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 72 20% 97%;
-  --sidebar-accent-foreground: 220 43% 11%;
-  --sidebar-ring: 16 88% 59%;
+  --sidebar-accent: 166 76% 97%;
+  --sidebar-accent-foreground: 160 88% 20%;
+  --sidebar-ring: 29 95% 50%;
 
   --popover: 0 0% 100%;
   --popover-foreground: 220 43% 11%;
-  --popover-border: 220 13% 91%;
+  --popover-border: 20 6% 90%;
 
-  /* F26B3A */
-  --primary: 16 88% 59%;
+  /* 065F46 */
+  --primary: 160 88% 20%;
   --primary-foreground: 0 0% 100%;
 
-  /* D94A1E */
-  --secondary: 14 76% 48%;
+  /* 0D9488 */
+  --secondary: 174 84% 32%;
   --secondary-foreground: 0 0% 100%;
 
-  --muted: 220 14% 96%;
+  --muted: 60 5% 96%;
   /* 667085 */
   --muted-foreground: 214 13% 46%;
 
-  --accent: 72 20% 97%;
-  --accent-foreground: 220 43% 11%;
+  /* F97F06 */
+  --accent: 29 95% 50%;
+  --accent-foreground: 0 0% 100%;
 
   /* DC2626 */
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  /* 0F9F6E */
-  --success: 160 83% 34%;
+  /* 065F46 */
+  --success: 160 88% 20%;
   --success-foreground: 0 0% 100%;
 
-  /* D97706 */
-  --warning: 32 94% 44%;
+  /* F97F06 */
+  --warning: 29 95% 50%;
   --warning-foreground: 0 0% 100%;
 
-  /* 2563EB */
-  --info: 221 83% 53%;
+  /* 0D9488 */
+  --info: 174 84% 32%;
   --info-foreground: 0 0% 100%;
 
-  --input: 220 13% 91%;
-  --ring: 16 88% 59%;
+  --input: 20 6% 90%;
+  --ring: 29 95% 50%;
 
-  --app-font-sans: 'Inter', sans-serif;
+  --app-font-sans: 'Manrope', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
   --radius: 0.75rem; /* rounded-xl roughly */
@@ -165,42 +171,42 @@
   --sidebar: 220 43% 8%;
   --sidebar-foreground: 72 20% 97%;
   --sidebar-border: 220 20% 16%;
-  --sidebar-primary: 16 88% 59%;
+  --sidebar-primary: 29 95% 50%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 220 43% 14%;
   --sidebar-accent-foreground: 72 20% 97%;
-  --sidebar-ring: 16 88% 59%;
+  --sidebar-ring: 29 95% 50%;
 
   --popover: 220 43% 8%;
   --popover-foreground: 72 20% 97%;
   --popover-border: 220 20% 16%;
 
-  --primary: 16 88% 59%;
+  --primary: 160 88% 20%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 14 76% 48%;
+  --secondary: 174 84% 32%;
   --secondary-foreground: 0 0% 100%;
 
   --muted: 220 20% 16%;
   --muted-foreground: 214 13% 70%;
 
-  --accent: 220 43% 14%;
-  --accent-foreground: 72 20% 97%;
+  --accent: 29 95% 50%;
+  --accent-foreground: 0 0% 100%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  --success: 160 83% 34%;
+  --success: 160 88% 20%;
   --success-foreground: 0 0% 100%;
 
-  --warning: 32 94% 44%;
+  --warning: 29 95% 50%;
   --warning-foreground: 0 0% 100%;
 
-  --info: 221 83% 53%;
+  --info: 174 84% 32%;
   --info-foreground: 0 0% 100%;
 
   --input: 220 20% 16%;
-  --ring: 16 88% 59%;
+  --ring: 29 95% 50%;
 }
 
 @layer base {

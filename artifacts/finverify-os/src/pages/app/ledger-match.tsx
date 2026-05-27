@@ -41,7 +41,7 @@ export default function LedgerMatchPage() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { label: "Matched", count: matched, color: "bg-success text-white" },
-          { label: "Unmatched", count: unmatched, color: "bg-amber-500 text-white" },
+          { label: "Unmatched", count: unmatched, color: "fv-brand-accent-bg" },
           { label: "Total", count: data.length, color: "bg-muted text-foreground border border-border" },
         ].map(s => (
           <div key={s.label} className={`rounded-xl p-4 text-center ${s.color}`}>

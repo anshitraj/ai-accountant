@@ -21,39 +21,46 @@ export function formatDate(dateStr: string): string {
 }
 
 export function statusColor(status: string): string {
+  const verified = "fv-status-verified";
+  const unverified = "fv-status-unverified";
+  const missing = "fv-status-missing";
+  const risk = "fv-status-risk";
+  const review = "fv-status-review";
   const map: Record<string, string> = {
-    verified: "bg-green-100 text-green-800 border-green-200",
-    unverified: "bg-gray-100 text-gray-700 border-gray-200",
-    missing_invoice: "bg-amber-100 text-amber-800 border-amber-200",
-    missing_gstin: "bg-amber-100 text-amber-800 border-amber-200",
-    amount_mismatch: "bg-red-100 text-red-800 border-red-200",
-    date_mismatch: "bg-red-100 text-red-800 border-red-200",
-    gst_risk: "bg-red-100 text-red-800 border-red-200",
-    tds_risk: "bg-red-100 text-red-800 border-red-200",
-    payroll_mismatch: "bg-red-100 text-red-800 border-red-200",
-    gateway_settlement_mismatch: "bg-orange-100 text-orange-800 border-orange-200",
-    needs_ca_review: "bg-blue-100 text-blue-800 border-blue-200",
-    ca_ready: "bg-green-100 text-green-800 border-green-200",
-    duplicate: "bg-orange-100 text-orange-800 border-orange-200",
-    matched: "bg-green-100 text-green-800 border-green-200",
-    unmatched: "bg-amber-100 text-amber-800 border-amber-200",
-    pending: "bg-blue-100 text-blue-800 border-blue-200",
-    approved: "bg-green-100 text-green-800 border-green-200",
-    rejected: "bg-red-100 text-red-800 border-red-200",
-    open: "bg-red-100 text-red-800 border-red-200",
-    resolved: "bg-green-100 text-green-800 border-green-200",
-    partial: "bg-amber-100 text-amber-800 border-amber-200",
-    paid: "bg-green-100 text-green-800 border-green-200",
-    unpaid: "bg-gray-100 text-gray-700 border-gray-200",
-    missing: "bg-red-100 text-red-800 border-red-200",
-    suspense: "bg-orange-100 text-orange-800 border-orange-200",
-    fee_mismatch: "bg-orange-100 text-orange-800 border-orange-200",
-    processed: "bg-green-100 text-green-800 border-green-200",
-    document_requested: "bg-purple-100 text-purple-800 border-purple-200",
-    none: "bg-green-100 text-green-800 border-green-200",
-    tds_review: "bg-red-100 text-red-800 border-red-200",
+    verified,
+    unverified,
+    missing_invoice: missing,
+    missing_gstin: missing,
+    amount_mismatch: risk,
+    date_mismatch: risk,
+    gst_risk: risk,
+    tds_risk: risk,
+    payroll_mismatch: risk,
+    gateway_settlement_mismatch: missing,
+    needs_ca_review: review,
+    ca_ready: verified,
+    duplicate: missing,
+    matched: verified,
+    unmatched: missing,
+    pending: review,
+    approved: verified,
+    rejected: risk,
+    open: risk,
+    potential_risk: risk,
+    resolved: verified,
+    partial: missing,
+    paid: verified,
+    unpaid: unverified,
+    missing: missing,
+    suspense: missing,
+    fee_mismatch: missing,
+    processed: verified,
+    metadata_only: review,
+    document_requested: review,
+    none: verified,
+    tds_review: risk,
   };
-  return map[status] || "bg-gray-100 text-gray-700 border-gray-200";
+  return map[status] || unverified;
 }
 
 export function statusLabel(status: string): string {
@@ -77,6 +84,7 @@ export function statusLabel(status: string): string {
     approved: "Approved",
     rejected: "Rejected",
     open: "Open",
+    potential_risk: "Potential risk",
     resolved: "Resolved",
     partial: "Partial",
     paid: "Paid",
@@ -85,6 +93,7 @@ export function statusLabel(status: string): string {
     suspense: "Suspense",
     fee_mismatch: "Fee Mismatch",
     processed: "Processed",
+    metadata_only: "Metadata only",
     partial_payment: "Partial Payment",
     exact: "Exact Match",
     potential: "Potential Match",
@@ -97,17 +106,17 @@ export function statusLabel(status: string): string {
 
 export function severityColor(severity: string): string {
   const map: Record<string, string> = {
-    high: "bg-red-100 text-red-800 border-red-200",
-    medium: "bg-amber-100 text-amber-800 border-amber-200",
-    low: "bg-blue-100 text-blue-800 border-blue-200",
+    high: "fv-status-risk",
+    medium: "fv-status-missing",
+    low: "fv-status-review",
   };
-  return map[severity] || "bg-gray-100 text-gray-700 border-gray-200";
+  return map[severity] || "fv-status-unverified";
 }
 
 export function confidenceColor(score: number): string {
-  if (score >= 85) return "bg-green-500";
-  if (score >= 60) return "bg-amber-500";
-  return "bg-red-500";
+  if (score >= 85) return "bg-success";
+  if (score >= 60) return "bg-warning";
+  return "bg-destructive";
 }
 
 export function exportToCsv(data: Record<string, unknown>[], filename: string): void {

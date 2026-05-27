@@ -18,10 +18,13 @@ import {
   Puzzle,
   Search,
   Settings,
+  ShieldCheck,
   Upload,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { BrandMark } from "@/components/app/finverify-ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getUser, logout } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -60,11 +63,21 @@ const navGroups = [
   {
     label: "Workspace",
     items: [
+      { label: "Admin Dashboard", href: "/app/admin", icon: ShieldCheck },
       { label: "Integrations", href: "/app/integrations", icon: Puzzle },
       { label: "Settings", href: "/app/settings", icon: Settings },
     ],
   },
 ] as const;
+
+const notifications: Array<{
+  title: string;
+  description: string;
+  time: string;
+  href: string;
+  icon: LucideIcon;
+  tone: "risk" | "review" | "upload";
+}> = [];
 
 interface AppShellProps {
   children: ReactNode;
@@ -89,19 +102,21 @@ export default function AppShell({ children }: AppShellProps) {
 
   const Sidebar = () => (
     <div className="flex h-full flex-col">
-      <div className={cn("flex h-20 items-center border-b border-border px-4", collapsed ? "justify-center" : "justify-between")}>
+      <div className={cn("flex h-20 items-center border-b border-white/10 px-4", collapsed ? "justify-center" : "justify-between")}>
         <div className={cn("min-w-0", collapsed && "hidden")}>
-          <BrandMark />
-          <div className="mt-1 truncate text-xs text-muted-foreground">{user.company}</div>
+          <div className="fv-wordmark-chip inline-flex rounded-2xl px-3 py-2 shadow-sm">
+            <BrandMark />
+          </div>
+          <div className="mt-2 truncate text-xs text-white/65">{user.company}</div>
         </div>
-        {collapsed && <BrandMark compact />}
+        {collapsed && <div className="fv-wordmark-chip rounded-2xl p-2 shadow-sm"><BrandMark compact /></div>}
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4">
         {navGroups.map(group => (
           <div key={group.label} className="mb-4">
             {!collapsed && (
-              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">
+              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
                 {group.label}
               </div>
             )}
@@ -122,12 +137,12 @@ export default function AppShell({ children }: AppShellProps) {
                       "group relative flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition",
                       collapsed && "justify-center",
                       active
-                        ? "bg-primary/10 text-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        ? "fv-brand-accent-bg shadow-sm"
+                        : "text-white/72 hover:bg-white/10 hover:text-white"
                     )}
                   >
-                    {active && <span className="absolute left-0 top-2 h-6 w-1 rounded-r-full bg-primary" />}
-                    <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                    {active && <span className="absolute left-0 top-2 h-6 w-1 rounded-r-full bg-white/80" />}
+                    <Icon className={cn("h-4 w-4 shrink-0", active ? "text-white" : "text-white/60 group-hover:text-white")} />
                     {!collapsed && <span className="truncate">{item.label}</span>}
                   </button>
                 );
@@ -137,24 +152,24 @@ export default function AppShell({ children }: AppShellProps) {
         ))}
       </nav>
 
-      <div className={cn("border-t border-border p-3", collapsed && "flex justify-center")}>
+      <div className={cn("border-t border-white/10 p-3", collapsed && "flex justify-center")}>
         {collapsed ? (
-          <button type="button" onClick={handleLogout} className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Logout">
+          <button type="button" onClick={handleLogout} className="rounded-xl p-2 text-white/65 hover:bg-white/10 hover:text-white" aria-label="Logout">
             <LogOut className="h-4 w-4" />
           </button>
         ) : (
-          <div className="rounded-2xl border border-border bg-background p-3">
+          <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+              <div className="fv-text-brand-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold">
                 {user.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{user.name}</div>
-                <div className="mt-0.5 inline-flex rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-semibold capitalize text-muted-foreground">
+                <div className="truncate text-sm font-semibold text-white">{user.name}</div>
+                <div className="mt-0.5 inline-flex rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[11px] font-semibold capitalize text-white/75">
                   {user.role}
                 </div>
               </div>
-              <button type="button" onClick={handleLogout} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Logout">
+              <button type="button" onClick={handleLogout} className="rounded-lg p-1.5 text-white/65 hover:bg-white/10 hover:text-white" aria-label="Logout">
                 <LogOut className="h-4 w-4" />
               </button>
             </div>
@@ -166,7 +181,7 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <aside className={cn("hidden shrink-0 border-r border-border bg-card transition-all duration-200 lg:flex", collapsed ? "w-[4.5rem]" : "w-64")}>
+      <aside className={cn("fv-brand-primary-bg hidden shrink-0 border-r border-primary/20 transition-all duration-200 lg:flex", collapsed ? "w-[4.5rem]" : "w-64")}>
         <Sidebar />
       </aside>
 
@@ -185,7 +200,7 @@ export default function AppShell({ children }: AppShellProps) {
               animate={{ x: 0 }}
               exit={{ x: -288 }}
               transition={{ type: "spring", damping: 28, stiffness: 220 }}
-              className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card lg:hidden"
+              className="fv-brand-primary-bg fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-primary/20 lg:hidden"
             >
               <Sidebar />
             </motion.aside>
@@ -194,7 +209,7 @@ export default function AppShell({ children }: AppShellProps) {
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur sm:px-5">
+        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur sm:px-5">
           <button
             type="button"
             onClick={() => setCollapsed(v => !v)}
@@ -212,12 +227,12 @@ export default function AppShell({ children }: AppShellProps) {
             <Menu className="h-4 w-4" />
           </button>
 
-          <div className="relative hidden min-w-0 max-w-xl flex-1 md:block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="fv-search-field hidden min-w-0 max-w-2xl flex-1 md:flex">
+            <Search className="fv-search-icon" />
             <input
               aria-label="Global search"
               placeholder="Search invoices, UTRs, vendors, risks..."
-              className="fv-input w-full pl-9"
+              className="fv-search-input"
             />
           </div>
 
@@ -237,10 +252,73 @@ export default function AppShell({ children }: AppShellProps) {
               <Upload className="h-4 w-4" />
               Upload
             </button>
-            <button type="button" className="relative rounded-xl border border-border bg-card p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Notifications">
-              <Bell className="h-4 w-4" />
-              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
-            </button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="relative rounded-xl border border-border bg-card p-2 text-muted-foreground transition hover:border-primary/30 hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-secondary/20"
+                  aria-label="Open notifications"
+                >
+                  <Bell className="h-4 w-4" />
+                  {notifications.length > 0 && <span className="fv-brand-accent-bg absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full" />}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={10} className="w-[22rem] rounded-2xl border-border bg-card p-0 shadow-[0_20px_60px_rgba(6,95,70,0.14)]">
+                <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Notifications</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">Finance checks that need attention</div>
+                  </div>
+                  <span className="fv-status-review rounded-full border px-2 py-0.5 text-[11px] font-semibold">
+                    {notifications.length} open
+                  </span>
+                </div>
+                <div className="max-h-[22rem] overflow-y-auto p-2">
+                  {notifications.length === 0 && (
+                    <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                      No notifications yet. Upload files or run reconciliation to create review events.
+                    </div>
+                  )}
+                  {notifications.map(item => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <button
+                        key={item.title}
+                        type="button"
+                        onClick={() => navigate(item.href)}
+                        className="group flex w-full gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-muted/60"
+                      >
+                        <span
+                          className={cn(
+                            "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
+                            item.tone === "risk" && "fv-status-risk",
+                            item.tone === "review" && "fv-status-missing",
+                            item.tone === "upload" && "fv-status-verified"
+                          )}
+                        >
+                          <ItemIcon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-semibold text-foreground">{item.title}</span>
+                            <span className="shrink-0 text-[11px] text-muted-foreground">{item.time}</span>
+                          </span>
+                          <span className="mt-1 block text-xs leading-5 text-muted-foreground">{item.description}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between border-t border-border px-4 py-3">
+                  <button type="button" onClick={() => navigate("/app/ca-review")} className="text-xs font-semibold text-primary hover:underline">
+                    Open CA queue
+                  </button>
+                  <button type="button" onClick={() => navigate("/app/settings")} className="text-xs font-medium text-muted-foreground hover:text-foreground">
+                    Notification settings
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </header>
 

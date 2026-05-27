@@ -83,9 +83,9 @@ const INTEGRATIONS = [
 ];
 
 function statusClass(status: string) {
-  if (status === "Available") return "bg-green-100 text-green-800 border-green-200";
-  if (status === "Upload-based") return "bg-blue-100 text-blue-800 border-blue-200";
-  return "bg-amber-100 text-amber-800 border-amber-200";
+  if (status === "Available") return "fv-status-verified";
+  if (status === "Upload-based") return "fv-status-review";
+  return "fv-status-missing";
 }
 
 export default function IntegrationsPage() {

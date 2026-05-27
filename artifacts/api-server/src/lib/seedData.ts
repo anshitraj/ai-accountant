@@ -1,6 +1,7 @@
 import { db } from "@workspace/db";
 import {
   auditLogsTable,
+  authSessionsTable,
   uploadBatchesTable,
   bankTransactionsTable,
   companiesTable,
@@ -8,6 +9,7 @@ import {
   gstRecordsTable,
   invoicesTable,
   ledgerEntriesTable,
+  oauthAccountsTable,
   payrollEntriesTable,
   gatewaySettlementsTable,
   reconciliationMatchesTable,
@@ -16,27 +18,40 @@ import {
   rolePermissionsTable,
   usersTable,
 } from "@workspace/db";
+import { inArray } from "drizzle-orm";
+import { hashPassword } from "../services/auth";
+
+const DEMO_COMPANY_NAME = "NovaStack Labs Pvt Ltd";
 
 export async function seedDemoData() {
-  // Clear existing demo data
-  await db.delete(auditLogsTable);
-  await db.delete(gstRecordsTable);
-  await db.delete(documentsTable);
-  await db.delete(rolePermissionsTable);
-  await db.delete(usersTable);
-  await db.delete(companiesTable);
-  await db.delete(caReviewItemsTable);
-  await db.delete(reconciliationMatchesTable);
-  await db.delete(riskFlagsTable);
-  await db.delete(gatewaySettlementsTable);
-  await db.delete(payrollEntriesTable);
-  await db.delete(ledgerEntriesTable);
-  await db.delete(invoicesTable);
-  await db.delete(bankTransactionsTable);
-  await db.delete(uploadBatchesTable);
+  const existingDemoCompanies = await db
+    .select({ id: companiesTable.id })
+    .from(companiesTable)
+    .where(inArray(companiesTable.name, [DEMO_COMPANY_NAME]));
+  const demoCompanyIds = existingDemoCompanies.map((company) => company.id);
+
+  if (demoCompanyIds.length > 0) {
+    await db.delete(authSessionsTable).where(inArray(authSessionsTable.companyId, demoCompanyIds));
+    await db.delete(oauthAccountsTable).where(inArray(oauthAccountsTable.companyId, demoCompanyIds));
+    await db.delete(auditLogsTable).where(inArray(auditLogsTable.companyId, demoCompanyIds));
+    await db.delete(gstRecordsTable).where(inArray(gstRecordsTable.companyId, demoCompanyIds));
+    await db.delete(documentsTable).where(inArray(documentsTable.companyId, demoCompanyIds));
+    await db.delete(rolePermissionsTable).where(inArray(rolePermissionsTable.companyId, demoCompanyIds));
+    await db.delete(usersTable).where(inArray(usersTable.companyId, demoCompanyIds));
+    await db.delete(caReviewItemsTable).where(inArray(caReviewItemsTable.companyId, demoCompanyIds));
+    await db.delete(reconciliationMatchesTable).where(inArray(reconciliationMatchesTable.companyId, demoCompanyIds));
+    await db.delete(riskFlagsTable).where(inArray(riskFlagsTable.companyId, demoCompanyIds));
+    await db.delete(gatewaySettlementsTable).where(inArray(gatewaySettlementsTable.companyId, demoCompanyIds));
+    await db.delete(payrollEntriesTable).where(inArray(payrollEntriesTable.companyId, demoCompanyIds));
+    await db.delete(ledgerEntriesTable).where(inArray(ledgerEntriesTable.companyId, demoCompanyIds));
+    await db.delete(invoicesTable).where(inArray(invoicesTable.companyId, demoCompanyIds));
+    await db.delete(bankTransactionsTable).where(inArray(bankTransactionsTable.companyId, demoCompanyIds));
+    await db.delete(uploadBatchesTable).where(inArray(uploadBatchesTable.companyId, demoCompanyIds));
+    await db.delete(companiesTable).where(inArray(companiesTable.id, demoCompanyIds));
+  }
 
   const [company] = await db.insert(companiesTable).values({
-    name: "NovaStack Labs Pvt Ltd",
+    name: DEMO_COMPANY_NAME,
     industry: "SaaS + marketing agency",
     monthlyRevenueRange: "₹42L",
     caEmail: "ca@finverify.in",
@@ -47,11 +62,14 @@ export async function seedDemoData() {
     dataRetentionDays: 365,
   }).returning();
 
+  const demoPassword = hashPassword("demo1234");
   const users = await db.insert(usersTable).values([
     {
       companyId: company.id,
       name: "Rahul Mehta",
       email: "rahul@novastack.in",
+      passwordHash: demoPassword.hash,
+      passwordSalt: demoPassword.salt,
       role: "founder",
       status: "active",
     },
@@ -59,6 +77,8 @@ export async function seedDemoData() {
       companyId: company.id,
       name: "CA Priya Sharma",
       email: "ca@finverify.in",
+      passwordHash: demoPassword.hash,
+      passwordSalt: demoPassword.salt,
       role: "ca",
       status: "active",
     },
@@ -66,6 +86,8 @@ export async function seedDemoData() {
       companyId: company.id,
       name: "Ananya Rao",
       email: "finance@novastack.in",
+      passwordHash: demoPassword.hash,
+      passwordSalt: demoPassword.salt,
       role: "admin",
       status: "active",
     },
@@ -86,8 +108,10 @@ export async function seedDemoData() {
     { companyId: company.id, role: "founder", permission: "reconciliation.reject", enabled: true },
     { companyId: company.id, role: "founder", permission: "uploads.read", enabled: true },
     { companyId: company.id, role: "founder", permission: "uploads.create", enabled: true },
+    { companyId: company.id, role: "founder", permission: "uploads.delete", enabled: true },
     { companyId: company.id, role: "founder", permission: "reports.export", enabled: true },
     { companyId: company.id, role: "founder", permission: "settings.manage_company", enabled: true },
+    { companyId: company.id, role: "founder", permission: "ai.assist", enabled: true },
     { companyId: company.id, role: "admin", permission: "overview.read", enabled: true },
     { companyId: company.id, role: "admin", permission: "transactions.read", enabled: true },
     { companyId: company.id, role: "admin", permission: "invoices.read", enabled: true },
@@ -99,11 +123,13 @@ export async function seedDemoData() {
     { companyId: company.id, role: "admin", permission: "reconciliation.read", enabled: true },
     { companyId: company.id, role: "admin", permission: "uploads.read", enabled: true },
     { companyId: company.id, role: "admin", permission: "uploads.create", enabled: true },
+    { companyId: company.id, role: "admin", permission: "uploads.delete", enabled: true },
     { companyId: company.id, role: "admin", permission: "invoices.create", enabled: true },
     { companyId: company.id, role: "admin", permission: "transactions.update_status", enabled: true },
     { companyId: company.id, role: "admin", permission: "reconciliation.run", enabled: true },
     { companyId: company.id, role: "admin", permission: "reconciliation.approve", enabled: true },
     { companyId: company.id, role: "admin", permission: "reconciliation.reject", enabled: true },
+    { companyId: company.id, role: "admin", permission: "ai.assist", enabled: true },
     { companyId: company.id, role: "ca", permission: "overview.read", enabled: true },
     { companyId: company.id, role: "ca", permission: "transactions.read", enabled: true },
     { companyId: company.id, role: "ca", permission: "invoices.read", enabled: true },
@@ -118,6 +144,7 @@ export async function seedDemoData() {
     { companyId: company.id, role: "ca", permission: "uploads.read", enabled: true },
     { companyId: company.id, role: "ca", permission: "ca_review.process", enabled: true },
     { companyId: company.id, role: "ca", permission: "risks.resolve", enabled: true },
+    { companyId: company.id, role: "ca", permission: "ai.assist", enabled: true },
     { companyId: company.id, role: "ca", permission: "settings.manage_company", enabled: false },
   ]);
 
@@ -331,37 +358,36 @@ export async function seedDemoData() {
 
   // Risk Flags (15 entries)
   await db.insert(riskFlagsTable).values([
-    { entityType: "invoice", entityId: invoices[2].id, category: "Missing GSTIN", severity: "high", reason: "AWS invoice INV-AWS-2026-045 has no valid GSTIN. Input tax credit cannot be claimed.", suggestedAction: "Obtain GSTIN from vendor or reclassify as import of services. Needs CA review.", status: "open" },
-    { entityType: "transaction", entityId: txns[9].id, category: "Invoice Missing", severity: "high", reason: "Debit of ₹32,000 with narration 'Unknown Vendor/Payment no reference' has no linked invoice.", suggestedAction: "Locate the invoice or vendor details. Cannot be included in purchase register without documentation.", status: "open" },
-    { entityType: "transaction", entityId: txns[26].id, category: "Possible TDS Deduction", severity: "high", reason: "Vendor advance ₹75,000 to Ola Electric without TDS deduction note. May fall under Section 194C.", suggestedAction: "Verify TDS applicability with CA. If applicable, TDS certificate and challan needed.", status: "open" },
-    { entityType: "transaction", entityId: txns[36].id, category: "Possible TDS Deduction", severity: "high", reason: "Contractor payment ₹45,000 without TDS deducted. No invoice attached. Section 194C or 194J may apply.", suggestedAction: "Obtain invoice from contractor. Verify TDS requirement with CA before closing books.", status: "open" },
-    { entityType: "transaction", entityId: txns[51].id, category: "Duplicate Invoice", severity: "medium", reason: "Meesho Supplier payment appears twice - ₹3,20,000 on 26th and 29th May with identical narration.", suggestedAction: "Verify if both payments are genuine. Reverse one if duplicate. Flag for CA review.", status: "open" },
-    { entityType: "invoice", entityId: invoices[5].id, category: "Missing GSTIN", severity: "medium", reason: "Notion Labs invoice INV-NOT-789 has no GSTIN. Foreign vendor - may be classified as import of service.", suggestedAction: "Confirm if GST reverse charge (RCM) applies. Document treatment for CA.", status: "open" },
-    { entityType: "invoice", entityId: invoices[9].id, category: "Missing GSTIN", severity: "medium", reason: "HubSpot India INV-HUB-2026-34 missing GSTIN. ITC cannot be availed.", suggestedAction: "Request GSTIN or tax invoice from HubSpot. Reclassify appropriately.", status: "open" },
-    { entityType: "transaction", entityId: txns[12].id, category: "High Value Cash Transaction", severity: "medium", reason: "ATM cash withdrawal ₹20,000 on 7 May with no supporting document or business purpose.", suggestedAction: "Document business purpose. Cash transactions above ₹10,000 need business justification.", status: "open" },
-    { entityType: "transaction", entityId: txns[42].id, category: "Invoice Missing", severity: "medium", reason: "Payment of ₹67,000 on 22 May with narration 'Unknown/No narration available'. Zero matching confidence.", suggestedAction: "Identify payment recipient. Obtain invoice before period close.", status: "open" },
-    { entityType: "gateway_settlement", entityId: settlements[8].id, category: "Gateway Fee Mismatch", severity: "medium", reason: "Stripe settlement STR-2026-0529 shows fee discrepancy vs expected rate. GST on fees may be understated.", suggestedAction: "Reconcile with Stripe dashboard. Verify fee schedule and GST computation.", status: "open" },
-    { entityType: "invoice", entityId: invoices[26].id, category: "Missing GSTIN", severity: "medium", reason: "Invoice INV-2026-011 from Dunzo Daily has no GSTIN. Cannot claim ITC.", suggestedAction: "Request proper tax invoice with GSTIN from Dunzo.", status: "open" },
-    { entityType: "transaction", entityId: txns[22].id, category: "Amount Mismatch", severity: "medium", reason: "Bank credit ₹1,50,000 from Zepto but invoice INV-2026-008 is for ₹2,00,000. Short payment of ₹50,000.", suggestedAction: "Follow up on balance ₹50,000. Do not close invoice until fully settled.", status: "open" },
-    { entityType: "payroll", category: "Payroll Mismatch", severity: "low", reason: "Payroll entry for Pooja Iyer (May 2026) shows no bank payment date or reference. Salary not disbursed.", suggestedAction: "Verify salary payment status with HR. Update bank reference in payroll register.", status: "open" },
-    { entityType: "ledger", entityId: ledger[8].id, category: "Suspense Ledger Usage", severity: "low", reason: "ATM withdrawal of ₹20,000 posted to Suspense Account. Should be mapped to a proper expense head.", suggestedAction: "Remap to correct ledger: Petty Cash, Travel, or other business expense.", status: "open" },
-    { entityType: "invoice", category: "Missing GSTIN", severity: "low", reason: "Multiple international vendor invoices (AWS, Stripe, Notion, HubSpot, Figma, Postman, Zendesk) lack Indian GSTIN. RCM may apply on all.", suggestedAction: "Review RCM applicability for all foreign SaaS vendors. Document treatment consistently.", status: "open" },
+    { entityType: "invoice", entityId: invoices[2].id, category: "Missing GSTIN", severity: "high", reason: "AWS invoice INV-AWS-2026-045 has no valid GSTIN in the uploaded evidence.", suggestedAction: "Potential risk — needs CA review. Obtain vendor tax details or document treatment with the CA.", status: "open" },
+    { entityType: "transaction", entityId: txns[9].id, category: "Invoice Missing", severity: "high", reason: "Debit of INR 32,000 with narration 'Unknown Vendor/Payment no reference' has no linked invoice.", suggestedAction: "Potential risk — needs CA review. Locate the invoice or vendor details before including this in close reports.", status: "open" },
+    { entityType: "transaction", entityId: txns[26].id, category: "Possible TDS Deduction", severity: "high", reason: "Vendor advance INR 75,000 to Ola Electric has no TDS deduction note in the uploaded evidence.", suggestedAction: "Potential risk — needs CA review. Verify TDS treatment and supporting documents with the CA.", status: "open" },
+    { entityType: "transaction", entityId: txns[36].id, category: "Possible TDS Deduction", severity: "high", reason: "Contractor payment INR 45,000 has no invoice attached and no TDS evidence in the uploaded files.", suggestedAction: "Potential risk — needs CA review. Obtain contractor invoice and confirm TDS treatment with the CA.", status: "open" },
+    { entityType: "transaction", entityId: txns[51].id, category: "Duplicate Invoice", severity: "medium", reason: "Meesho Supplier payment appears twice, INR 3,20,000 on 26th and 29th May, with identical narration.", suggestedAction: "Potential risk — needs CA review. Verify whether both payments are genuine before approval.", status: "open" },
+    { entityType: "invoice", entityId: invoices[5].id, category: "Missing GSTIN", severity: "medium", reason: "Notion Labs invoice INV-NOT-789 has no GSTIN in the uploaded invoice text.", suggestedAction: "Potential risk — needs CA review. Confirm GST/RCM treatment and document the decision.", status: "open" },
+    { entityType: "invoice", entityId: invoices[9].id, category: "Missing GSTIN", severity: "medium", reason: "HubSpot India INV-HUB-2026-34 is missing GSTIN in the uploaded evidence.", suggestedAction: "Potential risk — needs CA review. Request GSTIN or tax invoice from the vendor.", status: "open" },
+    { entityType: "transaction", entityId: txns[12].id, category: "High Value Cash Transaction", severity: "medium", reason: "ATM cash withdrawal INR 20,000 on 7 May has no supporting document or business purpose note.", suggestedAction: "Potential risk — needs CA review. Document business purpose and supporting evidence.", status: "open" },
+    { entityType: "transaction", entityId: txns[42].id, category: "Invoice Missing", severity: "medium", reason: "Payment of INR 67,000 on 22 May has narration 'Unknown/No narration available' and zero matching confidence.", suggestedAction: "Potential risk — needs CA review. Identify payment recipient and obtain invoice before period close.", status: "open" },
+    { entityType: "gateway_settlement", entityId: settlements[8].id, category: "Gateway Fee Mismatch", severity: "medium", reason: "Stripe settlement STR-2026-0529 shows a fee discrepancy against expected rate.", suggestedAction: "Potential risk — needs CA review. Reconcile with the uploaded Stripe settlement export and fee schedule.", status: "open" },
+    { entityType: "invoice", entityId: invoices[26].id, category: "Missing GSTIN", severity: "medium", reason: "Invoice INV-2026-011 from Dunzo Daily has no GSTIN in the uploaded evidence.", suggestedAction: "Potential risk — needs CA review. Request tax invoice with GSTIN from the vendor.", status: "open" },
+    { entityType: "transaction", entityId: txns[22].id, category: "Amount Mismatch", severity: "medium", reason: "Bank credit INR 1,50,000 from Zepto does not equal invoice INV-2026-008 amount INR 2,00,000.", suggestedAction: "Potential risk — needs CA review. Follow up on the INR 50,000 difference and keep invoice pending.", status: "open" },
+    { entityType: "payroll", category: "Payroll Mismatch", severity: "low", reason: "Payroll entry for Pooja Iyer (May 2026) shows no bank payment date or reference.", suggestedAction: "Potential risk — needs CA review. Verify salary payment status with HR and update bank reference.", status: "open" },
+    { entityType: "ledger", entityId: ledger[8].id, category: "Suspense Ledger Usage", severity: "low", reason: "ATM withdrawal INR 20,000 is posted to Suspense Account.", suggestedAction: "Potential risk — needs CA review. Remap to the correct ledger after review.", status: "open" },
+    { entityType: "invoice", category: "Missing GSTIN", severity: "low", reason: "Multiple international vendor invoices lack Indian GSTIN in the uploaded evidence.", suggestedAction: "Potential risk — needs CA review. Review treatment for foreign SaaS vendor invoices consistently.", status: "open" },
   ]);
 
   // CA Review Items
   await db.insert(caReviewItemsTable).values([
-    { entityType: "transaction", entityId: txns[26].id, title: "TDS risk on vendor advance - Ola Electric ₹75,000", description: "Payment to Ola Electric without TDS deduction. Section 194C may apply if this is a contractor payment.", severity: "high", status: "pending", founderNote: "This was an advance for hardware procurement. Not sure if TDS applies." },
-    { entityType: "transaction", entityId: txns[36].id, title: "Freelancer payment ₹45,000 without TDS or invoice", description: "Payment on 19 May to freelancer without invoice or TDS deduction. Section 194J likely applies.", severity: "high", status: "pending", founderNote: "Freelance UI designer for Q1 project. Will get invoice." },
-    { entityType: "transaction", entityId: txns[51].id, title: "Duplicate payment to Meesho Supplier - ₹3,20,000", description: "Same amount paid twice on 26th and 29th May. Bank narration nearly identical.", severity: "high", status: "pending", founderNote: "Checking with vendor if both payments are valid." },
-    { entityType: "invoice", entityId: invoices[2].id, title: "AWS invoice without GSTIN - ITC at risk", description: "INV-AWS-2026-045 ₹1,56,200 has no valid GSTIN. ITC of ~₹28,000 cannot be claimed.", severity: "high", status: "pending" },
-    { entityType: "transaction", entityId: txns[42].id, title: "Unidentified debit ₹67,000 - no narration", description: "Bank debit on 22 May with completely unknown narration. Cannot be categorised.", severity: "high", status: "pending", founderNote: "Checking with accounts team." },
-    { entityType: "reconciliation", title: "Zepto partial payment - ₹50,000 outstanding", description: "Zepto invoice INV-2026-008 for ₹2L received only ₹1.5L. Balance ₹50,000 not received.", severity: "medium", status: "pending", founderNote: "Zepto confirmed remaining payment by 5th June." },
-    { entityType: "invoice", title: "RCM on 7 foreign SaaS vendor invoices", description: "AWS, Stripe, Notion, HubSpot, Figma, Postman, Zendesk invoices lack GSTIN. RCM treatment required.", severity: "medium", status: "pending" },
-    { entityType: "gateway_settlement", entityId: settlements[8].id, title: "Stripe fee discrepancy - STR-2026-0529", description: "Gateway fees don't match expected rate. GST on fees appears understated.", severity: "medium", status: "pending" },
-    { entityType: "payroll", title: "Pooja Iyer salary not disbursed - May 2026", description: "Payroll register shows Pooja Iyer ₹80,600 but no corresponding bank debit found.", severity: "low", status: "pending", founderNote: "Will process by 2nd June." },
-    { entityType: "ledger", title: "Suspense account usage for ATM withdrawal", description: "₹20,000 ATM withdrawal mapped to Suspense account. Needs proper ledger assignment.", severity: "low", status: "pending" },
+    { entityType: "transaction", entityId: txns[26].id, title: "Potential TDS review on vendor advance - Ola Electric INR 75,000", description: "Payment to Ola Electric has no TDS note in the uploaded evidence. Potential risk — needs CA review.", severity: "high", status: "pending", founderNote: "This was an advance for hardware procurement. Need CA guidance." },
+    { entityType: "transaction", entityId: txns[36].id, title: "Freelancer payment INR 45,000 without invoice evidence", description: "Payment on 19 May to freelancer has no invoice or TDS evidence attached. Potential risk — needs CA review.", severity: "high", status: "pending", founderNote: "Freelance UI designer for Q1 project. Will get invoice." },
+    { entityType: "transaction", entityId: txns[51].id, title: "Duplicate payment to Meesho Supplier - INR 3,20,000", description: "Same amount paid twice on 26th and 29th May. Bank narration nearly identical. Potential risk — needs CA review.", severity: "high", status: "pending", founderNote: "Checking with vendor if both payments are valid." },
+    { entityType: "invoice", entityId: invoices[2].id, title: "AWS invoice without GSTIN evidence", description: "INV-AWS-2026-045 INR 1,56,200 has no valid GSTIN in the uploaded evidence. Potential risk — needs CA review.", severity: "high", status: "pending" },
+    { entityType: "transaction", entityId: txns[42].id, title: "Unidentified debit INR 67,000 - no narration", description: "Bank debit on 22 May has unknown narration in the uploaded statement. Potential risk — needs CA review.", severity: "high", status: "pending", founderNote: "Checking with accounts team." },
+    { entityType: "reconciliation", title: "Zepto partial payment - INR 50,000 difference", description: "Zepto invoice INV-2026-008 for INR 2L received only INR 1.5L in bank evidence. Potential risk — needs CA review.", severity: "medium", status: "pending", founderNote: "Zepto confirmed remaining payment by 5th June." },
+    { entityType: "invoice", title: "Foreign SaaS vendor invoice review", description: "AWS, Stripe, Notion, HubSpot, Figma, Postman, and Zendesk invoices lack GSTIN in the uploaded evidence. Potential risk — needs CA review.", severity: "medium", status: "pending" },
+    { entityType: "gateway_settlement", entityId: settlements[8].id, title: "Stripe fee discrepancy - STR-2026-0529", description: "Gateway fees do not match expected rate in uploaded exports. Potential risk — needs CA review.", severity: "medium", status: "pending" },
+    { entityType: "payroll", title: "Pooja Iyer salary not disbursed - May 2026", description: "Payroll register shows Pooja Iyer INR 80,600 but no corresponding bank debit found. Potential risk — needs CA review.", severity: "low", status: "pending", founderNote: "Will process by 2nd June." },
+    { entityType: "ledger", title: "Suspense account usage for ATM withdrawal", description: "INR 20,000 ATM withdrawal mapped to Suspense account. Potential risk — needs CA review.", severity: "low", status: "pending" },
   ]);
-
   const gstRecords = await db.insert(gstRecordsTable).values([
     {
       companyId: company.id,
@@ -441,7 +467,7 @@ export async function seedDemoData() {
       actorEmail: users[1].email,
       action: "ca_review.queue_created",
       entityType: "ca_review",
-      metadata: { pendingItems: 10, wording: "Potential risk - needs CA review" },
+      metadata: { pendingItems: 10, wording: "Potential risk — needs CA review" },
     },
     {
       companyId: company.id,

@@ -25,7 +25,7 @@ interface CaReviewItem {
 const ACTION_BUTTONS = [
   { action: "approve", label: "Approve", icon: CheckCircle, color: "bg-success/10 text-success hover:bg-success/20" },
   { action: "reject", label: "Reject", icon: XCircle, color: "bg-destructive/10 text-destructive hover:bg-destructive/20" },
-  { action: "request", label: "Request Doc", icon: FileQuestion, color: "bg-blue-50 text-blue-700 hover:bg-blue-100" },
+  { action: "request", label: "Request Doc", icon: FileQuestion, color: "fv-status-review hover:opacity-85" },
   { action: "resolve", label: "Resolve", icon: CheckCircle, color: "bg-muted text-muted-foreground hover:bg-muted/80" },
 ];
 
@@ -75,7 +75,7 @@ export default function CaReviewPage() {
             onClick={() => setStatusFilter(f)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
               statusFilter === f
-                ? "bg-primary text-white"
+                ? "fv-brand-accent-bg"
                 : "bg-card border border-border text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -124,13 +124,13 @@ export default function CaReviewPage() {
 
                 <div className="flex flex-wrap gap-2 mt-0.5">
                   {item.founderNote && (
-                    <div className="flex items-start gap-1.5 text-xs bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-lg border border-amber-100 max-w-full">
+                    <div className="fv-status-missing flex items-start gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border max-w-full">
                       <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                       <span><strong>Founder:</strong> {item.founderNote}</span>
                     </div>
                   )}
                   {item.caNote && (
-                    <div className="flex items-start gap-1.5 text-xs bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-lg border border-blue-100 max-w-full">
+                    <div className="fv-status-review flex items-start gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border max-w-full">
                       <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                       <span><strong>CA:</strong> {item.caNote}</span>
                     </div>

@@ -18,6 +18,7 @@ import { AlertTriangle, ArrowUpRight, FileText, Upload, WalletCards, Zap, type L
 import PageHeader from "@/components/app/PageHeader";
 import StatusBadge from "@/components/app/StatusBadge";
 import { EmptyState, PageTransition, ScoreCard, StatCard } from "@/components/app/finverify-ui";
+import { getUser } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 interface OverviewStats {
@@ -37,20 +38,36 @@ interface OverviewStats {
 }
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const CHART_COLORS = ["#0F9F6E", "#F26B3A", "#DC2626", "#2563EB", "#D97706"];
+const CHART_COLORS = ["#065F46", "#0D9488", "#F97F06", "#DC2626", "#78716C"];
 
 export default function OverviewPage() {
   const [, navigate] = useLocation();
-  const { data, isLoading } = useQuery<OverviewStats>({
+  const user = getUser();
+  const { data, isLoading, isError } = useQuery<OverviewStats>({
     queryKey: ["overview"],
-    queryFn: () => fetch(`${BASE}/api/overview`).then(r => r.json()),
+    queryFn: async () => {
+      const response = await fetch(`${BASE}/api/overview`);
+      if (!response.ok) throw new Error(`Overview request failed: ${response.status}`);
+      return response.json();
+    },
   });
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <PageTransition className="mx-auto max-w-7xl">
         <div className="grid gap-4 md:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-40 animate-pulse rounded-2xl border border-border bg-muted" />)}
+        </div>
+      </PageTransition>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <PageTransition className="mx-auto max-w-7xl">
+        <PageHeader title="Finance Control Room" subtitle="Could not load workspace data from the database." />
+        <div className="fv-card p-6">
+          <EmptyState title="Database data unavailable" description="Check that you are signed in and the API can reach the configured database." />
         </div>
       </PageTransition>
     );
@@ -81,7 +98,7 @@ export default function OverviewPage() {
     <PageTransition className="mx-auto max-w-7xl">
       <PageHeader
         title="Finance Control Room"
-        subtitle="NovaStack Labs Pvt Ltd / May 2026. Rule-first verification for upload-based finance data."
+        subtitle={`${user?.company ?? "Current workspace"} / upload-based finance verification from your database.`}
         actions={
           <button type="button" onClick={() => navigate("/app/uploads")} className="fv-button-primary">
             <Upload className="h-4 w-4" />
@@ -126,17 +143,17 @@ export default function OverviewPage() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <div className="text-sm font-semibold">Verified vs unverified</div>
-              <div className="text-xs text-muted-foreground">Monthly progress from existing demo data</div>
+              <div className="text-xs text-muted-foreground">Monthly progress from stored finance records</div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={data.monthlyProgress || []} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E7E5E4" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E5E7EB", fontSize: 12 }} />
-              <Area type="monotone" dataKey="verified" stackId="1" stroke="#0F9F6E" fill="#0F9F6E22" strokeWidth={2} />
-              <Area type="monotone" dataKey="unverified" stackId="1" stroke="#D97706" fill="#D9770622" strokeWidth={2} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E7E5E4", fontSize: 12 }} />
+              <Area type="monotone" dataKey="verified" stackId="1" stroke="#065F46" fill="#065F4622" strokeWidth={2} />
+              <Area type="monotone" dataKey="unverified" stackId="1" stroke="#F97F06" fill="#F97F0622" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

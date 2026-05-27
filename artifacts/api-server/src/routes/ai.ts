@@ -1,41 +1,481 @@
 import { Router, type IRouter } from "express";
+import { z } from "zod";
+import { and, eq } from "drizzle-orm";
+import { aiExtractionsTable, auditLogsTable, db, documentsTable, invoicesTable, uploadBatchesTable } from "@workspace/db";
+import { getCompanyId, requirePermission } from "../middleware/authz";
+import { getAIStatus, runAIJsonTask } from "../server/ai/providerRouter";
+import { invoiceExtractionSchema, invoiceExtractionSchemaDescription } from "../server/ai/schemas/invoiceExtractionSchema";
+import { extractInvoiceFields } from "../server/ai/extractInvoiceFields";
+import { monthEndSummarySchema, monthEndSummarySchemaDescription } from "../server/ai/schemas/monthEndSummarySchema";
+import { riskExplanationSchema, riskExplanationSchemaDescription } from "../server/ai/schemas/riskExplanationSchema";
+import { bankNarrationInterpretationSchema, columnMappingSchema, ledgerSuggestionSchema, schemaDescriptions } from "../server/ai/validators";
 
 const router: IRouter = Router();
 
-function aiMode() {
-  return process.env.OPENAI_API_KEY ? "ai-assisted" : "rule-based";
+router.get("/ai/status", requirePermission("ai.assist"), (_req, res): void => {
+  res.json(getAIStatus());
+});
+
+const extractInvoiceBodySchema = z.object({
+  uploadId: z.coerce.number().int().positive().optional(),
+  text: z.string().optional(),
+  metadata: z.unknown().optional(),
+  forceRuleBased: z.boolean().optional(),
+});
+
+const editExtractionBodySchema = z.object({
+  data: invoiceExtractionSchema.partial(),
+});
+
+function detectedMetadata(document: typeof documentsTable.$inferSelect | undefined) {
+  const raw = document?.detectedColumns;
+  return raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
 }
 
-router.post("/ai/extract-invoice", (req, res): void => {
+function textFromDocument(document: typeof documentsTable.$inferSelect | undefined): string {
+  const metadata = detectedMetadata(document);
+  return typeof metadata.textPreview === "string" ? metadata.textPreview : "";
+}
+
+async function auditAIAction(input: {
+  companyId: number;
+  userId?: number | null;
+  actorEmail?: string | null;
+  action: string;
+  entityId?: number | null;
+  metadata?: Record<string, unknown>;
+  ipAddress?: string;
+}) {
+  await db.insert(auditLogsTable).values({
+    companyId: input.companyId,
+    userId: input.userId ?? null,
+    actorEmail: input.actorEmail ?? "system@finverify.local",
+    action: input.action,
+    entityType: "ai_extraction",
+    entityId: input.entityId ?? null,
+    metadata: input.metadata ?? {},
+    ipAddress: input.ipAddress,
+  });
+}
+
+function reviewLabel(confidence: number) {
+  return confidence < 0.75 ? "Needs review" : "AI extracted — pending review";
+}
+
+function isInvoiceUploadSource(sourceType: string) {
+  return ["invoice", "invoices"].includes(sourceType.toLowerCase());
+}
+
+async function loadExtraction(id: number, companyId: number) {
+  const [extraction] = await db.select().from(aiExtractionsTable).where(and(
+    eq(aiExtractionsTable.id, id),
+    eq(aiExtractionsTable.companyId, companyId),
+  )).limit(1);
+  return extraction;
+}
+
+function invoiceValuesFromExtraction(input: {
+  companyId: number;
+  extraction: typeof aiExtractionsTable.$inferSelect;
+  data: z.infer<typeof invoiceExtractionSchema>;
+}) {
+  const missing = [];
+  if (!input.data.invoiceNumber) missing.push("invoiceNumber");
+  if (!input.data.vendorName) missing.push("vendorName");
+  if (!input.data.invoiceDate) missing.push("invoiceDate");
+  if (input.data.totalAmount === null || input.data.totalAmount === undefined) missing.push("totalAmount");
+  if (missing.length > 0) return { ok: false as const, missing };
+
+  return {
+    ok: true as const,
+    values: {
+      companyId: input.companyId,
+      invoiceNumber: input.data.invoiceNumber!,
+      vendorName: input.data.vendorName!,
+      customerName: input.data.customerName ?? null,
+      gstin: input.data.vendorGstin ?? input.data.customerGstin ?? null,
+      date: input.data.invoiceDate!,
+      amount: String(input.data.totalAmount!),
+      gstAmount: input.data.gstAmount !== null && input.data.gstAmount !== undefined ? String(input.data.gstAmount) : null,
+      type: "purchase",
+      paymentStatus: "unpaid",
+      status: "pending_reconciliation",
+    },
+  };
+}
+
+router.post("/ai/extract-invoice", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const body = extractInvoiceBodySchema.safeParse(req.body ?? {});
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const companyId = getCompanyId(req);
+  let upload: typeof uploadBatchesTable.$inferSelect | undefined;
+  let document: typeof documentsTable.$inferSelect | undefined;
+  let extractedText = body.data.text ?? "";
+  let fileName = String(body.data.metadata && typeof body.data.metadata === "object" && "fileName" in body.data.metadata
+    ? (body.data.metadata as { fileName?: unknown }).fileName ?? "invoice-text"
+    : "invoice-text");
+
+  if (body.data.uploadId) {
+    [upload] = await db.select().from(uploadBatchesTable).where(and(
+      eq(uploadBatchesTable.id, body.data.uploadId),
+      eq(uploadBatchesTable.companyId, companyId),
+    )).limit(1);
+    if (!upload) {
+      res.status(404).json({ error: "Upload not found" });
+      return;
+    }
+    if (!isInvoiceUploadSource(upload.sourceType)) {
+      res.status(422).json({
+        error: "Invoice extraction can only run on invoice uploads.",
+        detail: `${upload.fileName} is a ${upload.sourceType} upload. Use its parsed rows for reconciliation instead.`,
+      });
+      return;
+    }
+    [document] = await db.select().from(documentsTable).where(and(
+      eq(documentsTable.uploadBatchId, upload.id),
+      eq(documentsTable.companyId, companyId),
+    )).limit(1);
+    extractedText = textFromDocument(document);
+    fileName = upload.fileName;
+  }
+
+  if (!extractedText.trim()) {
+    res.status(422).json({ error: "No extracted text available. OCR required." });
+    return;
+  }
+
+  const result = await extractInvoiceFields({
+    uploadId: upload?.id ?? body.data.uploadId ?? null,
+    companyId,
+    userId: req.auth?.userId,
+    extractedText,
+    fileName,
+  });
+
+  const [extraction] = await db.insert(aiExtractionsTable).values({
+    companyId,
+    uploadId: upload?.id ?? body.data.uploadId ?? null,
+    entityType: "invoice",
+    entityId: null,
+    provider: result.provider,
+    model: result.model ?? null,
+    purpose: "invoice_extraction",
+    extractedJson: result.data,
+    confidence: String(result.confidence),
+    status: "extracted_pending_review",
+    createdBy: req.auth?.userId ?? null,
+  }).returning();
+
+  await auditAIAction({
+    companyId,
+    userId: req.auth?.userId,
+    actorEmail: req.auth?.email,
+    action: "ai.invoice_extracted",
+    entityId: extraction.id,
+    metadata: {
+      uploadId: upload?.id ?? null,
+      provider: result.provider,
+      model: result.model ?? null,
+      confidence: result.confidence,
+      usedFallback: result.usedFallback,
+    },
+    ipAddress: req.ip,
+  });
+
   res.json({
-    mode: aiMode(),
-    enabled: Boolean(process.env.OPENAI_API_KEY),
-    message: process.env.OPENAI_API_KEY
-      ? "AI-assisted extraction endpoint is ready for provider wiring."
-      : "AI disabled - using rule-based mode. PDF/image extraction is stored as metadata in this prototype.",
-    extracted: {
-      invoiceNumber: req.body?.invoiceNumber ?? null,
-      vendorName: req.body?.vendorName ?? null,
-      amount: req.body?.amount ?? null,
-      confidence: 0,
+    ok: result.ok,
+    id: extraction.id,
+    uploadId: upload?.id ?? null,
+    status: "extracted_pending_review",
+    label: "AI extracted — pending review",
+    reviewLabel: reviewLabel(result.confidence),
+    provider: result.provider,
+    model: result.model ?? null,
+    confidence: result.confidence,
+    usedFallback: result.usedFallback,
+    data: result.data,
+    error: result.error,
+  });
+});
+
+router.post("/ai/extractions/:id/accept", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid extraction id" });
+    return;
+  }
+
+  const companyId = getCompanyId(req);
+  const extraction = await loadExtraction(id, companyId);
+  if (!extraction) {
+    res.status(404).json({ error: "Extraction not found" });
+    return;
+  }
+
+  const parsed = invoiceExtractionSchema.safeParse(extraction.extractedJson);
+  if (!parsed.success) {
+    res.status(422).json({ error: "Extraction JSON is invalid", detail: parsed.error.message });
+    return;
+  }
+
+  const invoiceValues = invoiceValuesFromExtraction({ companyId, extraction, data: parsed.data });
+  if (!invoiceValues.ok) {
+    res.status(422).json({
+      error: "Cannot accept extraction until required fields are present.",
+      missingFields: invoiceValues.missing,
+    });
+    return;
+  }
+
+  const [invoice] = await db.insert(invoicesTable).values(invoiceValues.values).returning();
+  const [updated] = await db.update(aiExtractionsTable)
+    .set({ status: "accepted", entityId: invoice.id })
+    .where(and(eq(aiExtractionsTable.id, id), eq(aiExtractionsTable.companyId, companyId)))
+    .returning();
+
+  await auditAIAction({
+    companyId,
+    userId: req.auth?.userId,
+    actorEmail: req.auth?.email,
+    action: "ai.invoice_extraction_accepted",
+    entityId: updated.id,
+    metadata: { invoiceId: invoice.id, uploadId: extraction.uploadId ?? null },
+    ipAddress: req.ip,
+  });
+
+  res.json({
+    status: "accepted",
+    label: "Accepted for reconciliation",
+    extraction: updated,
+    invoice: {
+      id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      vendorName: invoice.vendorName,
+      date: invoice.date,
+      amount: parseFloat(invoice.amount as string),
+      gstAmount: invoice.gstAmount ? parseFloat(invoice.gstAmount as string) : null,
+      status: invoice.status,
     },
   });
 });
 
-router.post("/ai/explain-risk", (req, res): void => {
-  const category = req.body?.category ?? "Potential risk";
+router.post("/ai/extractions/:id/reject", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid extraction id" });
+    return;
+  }
+
+  const companyId = getCompanyId(req);
+  const [updated] = await db.update(aiExtractionsTable)
+    .set({ status: "rejected" })
+    .where(and(eq(aiExtractionsTable.id, id), eq(aiExtractionsTable.companyId, companyId)))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Extraction not found" });
+    return;
+  }
+  await auditAIAction({
+    companyId,
+    userId: req.auth?.userId,
+    actorEmail: req.auth?.email,
+    action: "ai.invoice_extraction_rejected",
+    entityId: updated.id,
+    metadata: { uploadId: updated.uploadId ?? null },
+    ipAddress: req.ip,
+  });
+  res.json({ status: "rejected", extraction: updated });
+});
+
+router.patch("/ai/extractions/:id/edit", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid extraction id" });
+    return;
+  }
+
+  const body = editExtractionBodySchema.safeParse(req.body ?? {});
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const companyId = getCompanyId(req);
+  const extraction = await loadExtraction(id, companyId);
+  if (!extraction) {
+    res.status(404).json({ error: "Extraction not found" });
+    return;
+  }
+  const current = invoiceExtractionSchema.safeParse(extraction.extractedJson);
+  if (!current.success) {
+    res.status(422).json({ error: "Existing extraction JSON is invalid", detail: current.error.message });
+    return;
+  }
+  const merged = invoiceExtractionSchema.parse({ ...current.data, ...body.data.data });
+  const [updated] = await db.update(aiExtractionsTable)
+    .set({
+      extractedJson: merged,
+      confidence: String(merged.confidence),
+      status: "edited_by_user",
+    })
+    .where(and(eq(aiExtractionsTable.id, id), eq(aiExtractionsTable.companyId, companyId)))
+    .returning();
+
+  await auditAIAction({
+    companyId,
+    userId: req.auth?.userId,
+    actorEmail: req.auth?.email,
+    action: "ai.invoice_extraction_edited",
+    entityId: updated.id,
+    metadata: { uploadId: updated.uploadId ?? null },
+    ipAddress: req.ip,
+  });
   res.json({
-    mode: aiMode(),
-    explanation: `${category}: Potential risk - needs CA review.`,
-    suggestedAction: "Collect supporting documents and ask the CA to confirm treatment before month close.",
+    status: "edited_by_user",
+    label: "AI extracted — pending review",
+    id: updated.id,
+    data: merged,
+    confidence: merged.confidence,
   });
 });
 
-router.post("/ai/month-end-summary", (_req, res): void => {
+router.post("/dev/test-ai-extraction", async (_req, res): Promise<void> => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  const result = await extractInvoiceFields({
+    companyId: 1,
+    userId: null,
+    uploadId: null,
+    fileName: "dev-sample-invoice.txt",
+    extractedText: "INVOICE No INV-2026-001 dated 2026-05-27 vendor ABC Services GSTIN 27ABCDE1234F1Z5 amount 118000 GST 18000 total 118000",
+  });
   res.json({
-    mode: aiMode(),
-    summary:
-      "Rule-based month-end summary: resolve missing invoices, review GST/TDS flags, approve high-confidence matches, and export CA-ready reports once the verification score reaches 85+.",
+    status: getAIStatus(),
+    expected: ["invoiceNumber", "invoiceDate", "vendorName", "vendorGstin", "totalAmount"],
+    result,
+  });
+});
+
+router.post("/ai/extract-invoice-text", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const result = await runAIJsonTask({
+    companyId: getCompanyId(req),
+    userId: req.auth?.userId,
+    purpose: "invoice_extraction",
+    schemaName: "invoice_extraction",
+    schema: invoiceExtractionSchema,
+    schemaDescription: invoiceExtractionSchemaDescription,
+    input: { text: req.body?.text ?? "", metadata: req.body?.metadata ?? null },
+    prompt: "Extract invoice fields only when they are explicitly supported by the text. Store as extracted_pending_review, never verified.",
+  });
+  res.json({
+    mode: result.provider === "rule_based" ? "rule-based" : "AI-assisted",
+    status: "extracted_pending_review",
+    reviewLabel: "Pending review",
+    source: result.provider === "rule_based" ? "deterministic rule" : "AI suggestion",
+    ...result,
+  });
+});
+
+router.post("/ai/interpret-bank-narration", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const result = await runAIJsonTask({
+    companyId: getCompanyId(req),
+    userId: req.auth?.userId,
+    purpose: "bank_narration_interpretation",
+    schemaName: "bank_narration_interpretation",
+    schema: bankNarrationInterpretationSchema,
+    schemaDescription: schemaDescriptions.bank_narration_interpretation,
+    input: { narration: req.body?.narration ?? "", amount: req.body?.amount ?? null, date: req.body?.date ?? null },
+    prompt: "Interpret narration conservatively. Do not create matches or mark the transaction as verified.",
+  });
+  res.json(result);
+});
+
+router.post("/ai/suggest-ledger", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const result = await runAIJsonTask({
+    companyId: getCompanyId(req),
+    userId: req.auth?.userId,
+    purpose: "ledger_suggestion",
+    schemaName: "ledger_suggestion",
+    schema: ledgerSuggestionSchema,
+    schemaDescription: schemaDescriptions.ledger_suggestion,
+    input: req.body ?? {},
+    prompt: "Suggest a ledger only from provided transaction, invoice, or narration data. This is not a posting decision.",
+  });
+  res.json(result);
+});
+
+router.post("/ai/explain-risk", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const result = await runAIJsonTask({
+    companyId: getCompanyId(req),
+    userId: req.auth?.userId,
+    purpose: "risk_explanation",
+    schemaName: "risk_explanation",
+    schema: riskExplanationSchema,
+    schemaDescription: riskExplanationSchemaDescription,
+    input: req.body ?? {},
+    prompt: "Explain the deterministic risk flag in CA-friendly language. Use the exact phrase Potential risk — needs CA review.",
+  });
+  res.json(result);
+});
+
+router.post("/ai/month-end-summary", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const result = await runAIJsonTask({
+    companyId: getCompanyId(req),
+    userId: req.auth?.userId,
+    purpose: "month_end_summary",
+    schemaName: "month_end_summary",
+    schema: monthEndSummarySchema,
+    schemaDescription: monthEndSummarySchemaDescription,
+    input: req.body ?? {},
+    prompt: "Summarize deterministic month-end verification status only. Do not claim readiness beyond provided checks.",
+  });
+  res.json(result);
+});
+
+router.post("/ai/suggest-column-mapping", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const result = await runAIJsonTask({
+    companyId: getCompanyId(req),
+    userId: req.auth?.userId,
+    purpose: "column_mapping",
+    schemaName: "column_mapping",
+    schema: columnMappingSchema,
+    schemaDescription: schemaDescriptions.column_mapping,
+    input: req.body ?? {},
+    prompt: "Suggest mappings only for provided column names. Unknown columns must stay unmapped.",
+  });
+  res.json(result);
+});
+
+router.post("/dev/test-ai", async (_req, res): Promise<void> => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  const result = await runAIJsonTask({
+    purpose: "risk_explanation",
+    schemaName: "dev_risk_explanation",
+    schema: riskExplanationSchema,
+    schemaDescription: riskExplanationSchemaDescription,
+    input: {
+      category: "Missing invoice",
+      severity: "medium",
+      detail: "One bank debit has no linked invoice in sample data.",
+    },
+    prompt: "Return a tiny valid JSON response for provider and fallback validation. Do not include real finance data.",
+  });
+  res.json({
+    status: getAIStatus(),
+    jsonValidation: result.ok ? "ok" : "error",
+    fallbackChain: result.usedFallback || result.provider === "rule_based" ? "fallback_used" : "primary_used",
+    result,
   });
 });
 

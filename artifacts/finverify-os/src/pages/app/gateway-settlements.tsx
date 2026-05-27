@@ -22,10 +22,10 @@ interface GatewaySettlement {
 }
 
 const PROVIDER_COLORS: Record<string, string> = {
-  razorpay: "bg-blue-50 text-blue-700",
-  stripe: "bg-purple-50 text-purple-700",
-  paytm: "bg-indigo-50 text-indigo-700",
-  phonepe: "bg-violet-50 text-violet-700",
+  razorpay: "fv-status-review",
+  stripe: "bg-primary/10 text-primary",
+  paytm: "bg-warning/10 text-warning",
+  phonepe: "fv-status-unverified",
 };
 
 export default function GatewaySettlementsPage() {

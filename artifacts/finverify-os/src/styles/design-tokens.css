@@ -1,42 +1,55 @@
 :root {
-  --fv-bg-page: #fafaf7;
+  /* FinVerify 2026 identity: stability from green, growth from teal, action from gold-orange. */
+  --fv-brand-primary: #065f46;
+  --fv-brand-secondary: #0d9488;
+  --fv-brand-accent: #f97f06;
+  --fv-brand-neutral: #78716c;
+
+  --fv-bg-page: #fafaf9;
   --fv-bg-surface: #ffffff;
-  --fv-bg-subtle: #f5f7fa;
+  --fv-bg-subtle: #f5f5f4;
   --fv-bg-warm: #fff7ed;
 
   --fv-text-primary: #101828;
   --fv-text-secondary: #667085;
-  --fv-text-muted: #98a2b3;
+  --fv-text-muted: #78716c;
 
-  --fv-border: #e5e7eb;
-  --fv-border-strong: #d0d5dd;
+  --fv-border: #e7e5e4;
+  --fv-border-strong: #d6d3d1;
 
-  --fv-accent: #f26b3a;
-  --fv-accent-dark: #d94a1e;
-  --fv-success: #0f9f6e;
-  --fv-warning: #d97706;
+  --fv-primary: var(--fv-brand-primary);
+  --fv-secondary: var(--fv-brand-secondary);
+  --fv-accent: var(--fv-brand-accent);
+  --fv-accent-dark: #d86705;
+  --fv-success: #065f46;
+  --fv-warning: #f97f06;
   --fv-risk: #dc2626;
-  --fv-info: #2563eb;
+  --fv-info: #0d9488;
 
-  --fv-status-verified-bg: #ecfdf3;
-  --fv-status-verified-text: #067647;
-  --fv-status-unverified-bg: #f2f4f7;
-  --fv-status-unverified-text: #475467;
+  --fv-status-verified-bg: #ecfdf5;
+  --fv-status-verified-text: #065f46;
+  --fv-status-verified-border: #a7f3d0;
+  --fv-status-unverified-bg: #f5f5f4;
+  --fv-status-unverified-text: #78716c;
+  --fv-status-unverified-border: #d6d3d1;
   --fv-status-risk-bg: #fef2f2;
   --fv-status-risk-text: #b42318;
-  --fv-status-review-bg: #eff6ff;
-  --fv-status-review-text: #175cd3;
+  --fv-status-risk-border: #fecaca;
+  --fv-status-review-bg: #ccfbf1;
+  --fv-status-review-text: #0f766e;
+  --fv-status-review-border: #5eead4;
   --fv-status-missing-bg: #fffaeb;
   --fv-status-missing-text: #b54708;
+  --fv-status-missing-border: #fed7aa;
 
   --fv-radius-sm: 10px;
   --fv-radius-md: 14px;
   --fv-radius-lg: 16px;
   --fv-radius-xl: 20px;
 
-  --fv-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 24px rgba(16, 24, 40, 0.04);
-  --fv-shadow-float: 0 18px 60px rgba(16, 24, 40, 0.12);
-  --fv-focus: 0 0 0 3px rgba(242, 107, 58, 0.18);
+  --fv-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 28px rgba(6, 95, 70, 0.05);
+  --fv-shadow-float: 0 22px 70px rgba(6, 95, 70, 0.14);
+  --fv-focus: 0 0 0 3px rgba(249, 127, 6, 0.2);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -69,7 +82,8 @@
   }
 
   .fv-button-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition;
+    background: var(--fv-accent);
   }
 
   .fv-button-primary:hover {
@@ -78,16 +92,25 @@
   }
 
   .fv-button-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border bg-card px-4 py-2 text-sm font-semibold transition;
+    border-color: rgba(13, 148, 136, 0.45);
+    color: var(--fv-secondary);
   }
 
   .fv-button-secondary:hover {
-    @apply bg-muted;
+    background: rgba(13, 148, 136, 0.08);
     transform: translateY(-1px);
   }
 
   .fv-button-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition;
+    border-color: rgba(120, 113, 108, 0.25);
+    color: var(--fv-brand-neutral);
+  }
+
+  .fv-button-ghost:hover {
+    background: rgba(120, 113, 108, 0.08);
+    color: var(--fv-text-primary);
   }
 
   .fv-focus {
@@ -103,8 +126,28 @@
   }
 
   .fv-input:focus {
-    border-color: rgba(242, 107, 58, 0.55);
+    border-color: rgba(249, 127, 6, 0.55);
     box-shadow: var(--fv-focus);
+  }
+
+  .fv-search-field {
+    @apply relative flex h-11 items-center rounded-2xl border border-border bg-card transition;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+  }
+
+  .fv-search-field:focus-within {
+    border-color: rgba(13, 148, 136, 0.45);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12), 0 10px 24px rgba(6, 95, 70, 0.06);
+  }
+
+  .fv-search-icon {
+    @apply pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2;
+    color: var(--fv-brand-secondary);
+  }
+
+  .fv-search-input {
+    @apply h-full w-full rounded-2xl bg-transparent py-2 pr-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground;
+    padding-left: 2.75rem;
   }
 
   .fv-table {
@@ -112,7 +155,8 @@
   }
 
   .fv-table thead th {
-    @apply sticky top-0 z-10 border-b border-border bg-muted/70 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground;
+    @apply sticky top-0 z-10 border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground;
+    background: #f2f7f4;
   }
 
   .fv-table tbody td {
@@ -120,10 +164,85 @@
   }
 
   .fv-table tbody tr:hover td {
-    @apply bg-muted/30;
+    background: rgba(13, 148, 136, 0.05);
   }
 
   .fv-section-band {
     @apply border-y border-border bg-card;
+  }
+
+  .fv-brand-icon {
+    background: var(--fv-brand-primary);
+    color: #fff;
+  }
+
+  .fv-wordmark-chip {
+    background: #fff;
+    color: var(--fv-text-primary);
+  }
+
+  .fv-brand-accent-bg {
+    background: var(--fv-brand-accent);
+    color: #fff;
+  }
+
+  .fv-brand-accent-bg:hover {
+    background: var(--fv-accent-dark);
+  }
+
+  .fv-brand-primary-bg {
+    background: var(--fv-brand-primary);
+    color: #fff;
+  }
+
+  .fv-brand-secondary-bg {
+    background: var(--fv-brand-secondary);
+    color: #fff;
+  }
+
+  .fv-text-brand-primary {
+    color: var(--fv-brand-primary);
+  }
+
+  .fv-text-brand-secondary {
+    color: var(--fv-brand-secondary);
+  }
+
+  .fv-text-brand-accent {
+    color: var(--fv-brand-accent);
+  }
+
+  .fv-border-brand-accent {
+    border-color: var(--fv-brand-accent);
+  }
+
+  .fv-status-verified {
+    background: var(--fv-status-verified-bg);
+    border-color: var(--fv-status-verified-border);
+    color: var(--fv-status-verified-text);
+  }
+
+  .fv-status-unverified {
+    background: var(--fv-status-unverified-bg);
+    border-color: var(--fv-status-unverified-border);
+    color: var(--fv-status-unverified-text);
+  }
+
+  .fv-status-risk {
+    background: var(--fv-status-risk-bg);
+    border-color: var(--fv-status-risk-border);
+    color: var(--fv-status-risk-text);
+  }
+
+  .fv-status-review {
+    background: var(--fv-status-review-bg);
+    border-color: var(--fv-status-review-border);
+    color: var(--fv-status-review-text);
+  }
+
+  .fv-status-missing {
+    background: var(--fv-status-missing-bg);
+    border-color: var(--fv-status-missing-border);
+    color: var(--fv-status-missing-text);
   }
 }

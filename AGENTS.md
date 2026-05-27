@@ -17,7 +17,7 @@ Build a YC-quality fintech SaaS UI inspired by Linear, Vercel, Stripe, Mercury, 
 ## Product Rules
 - Do not claim direct Tally/GST/bank integrations are live unless implemented.
 - Current version is upload-based unless a feature explicitly proves otherwise in code.
-- Use "Potential risk — needs CA review" for compliance issues.
+- Use "Potential risk — needs CA review." for compliance issues.
 - AI is optional, rule-first, and never the source of financial truth.
 - The app must run without an AI API key.
 - Preserve existing reconciliation logic, demo data, reports, and uploads.
@@ -27,10 +27,17 @@ Build a YC-quality fintech SaaS UI inspired by Linear, Vercel, Stripe, Mercury, 
 - Prefer incremental typed changes over broad rewrites.
 - Prefer modular services and reusable UI components for parsing, matching, risk generation, exports, and display patterns.
 - Keep README accurate about what is real, mocked, upload-based, or future work.
+- Never expose API keys client-side, log them, or commit `.env` files.
+- Never hardcode AI model names except safe defaults; read provider models from env/config.
+- Never use AI as the financial source of truth. Deterministic matching is authoritative.
+- Never claim legal, tax, GST, TDS, audit, or fraud certainty.
+- Always validate AI JSON against schemas before using it.
+- Always provide rule-based fallback when AI providers fail.
 
 ## Verification
-Before finishing any UI task:
+Before finishing any UI or backend task:
 - Run build/typecheck if available.
 - Check mobile responsiveness.
 - Review visual consistency.
 - Confirm no routes are broken.
+- Run the workspace build before final response.

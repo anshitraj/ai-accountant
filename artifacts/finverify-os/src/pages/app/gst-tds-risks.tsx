@@ -87,8 +87,8 @@ export default function GstTdsRisksPage() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { label: "High Risk", count: high, color: "bg-red-50 border-red-200 text-red-700", dot: "bg-red-500" },
-          { label: "Medium Risk", count: medium, color: "bg-amber-50 border-amber-200 text-amber-700", dot: "bg-amber-500" },
-          { label: "Low Risk", count: low, color: "bg-blue-50 border-blue-200 text-blue-700", dot: "bg-blue-500" },
+          { label: "Medium Risk", count: medium, color: "fv-status-missing", dot: "fv-brand-accent-bg" },
+          { label: "Low Risk", count: low, color: "fv-status-review", dot: "fv-brand-secondary-bg" },
         ].map(s => (
           <div key={s.label} className={`${s.color} border rounded-xl p-4 flex items-center gap-3`}>
             <div className={`w-3 h-3 rounded-full ${s.dot} flex-shrink-0`} />
@@ -111,7 +111,7 @@ export default function GstTdsRisksPage() {
         {gstLoading ? (
           <div className="p-6 text-sm text-muted-foreground text-center">Loading GST/TDS records...</div>
         ) : gstRecords.length === 0 ? (
-          <div className="p-6 text-sm text-muted-foreground text-center">No structured GST/TDS records yet. Seed demo data or upload GST/TDS files.</div>
+          <div className="p-6 text-sm text-muted-foreground text-center">No structured GST/TDS records yet. Upload GST/TDS files to create records.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -216,7 +216,7 @@ export default function GstTdsRisksPage() {
                       <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide">{r.category}</span>
                     </div>
                     <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <AlertTriangle className="fv-text-brand-accent w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                       <span>{r.suggestedAction}</span>
                     </div>
                   </div>

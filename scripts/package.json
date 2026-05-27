@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "test:ai": "tsx ./src/test-ai.ts",
+    "test:db": "tsx ./src/test-db.ts",
+    "test:r2": "tsx ./src/test-r2.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

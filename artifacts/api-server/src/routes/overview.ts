@@ -11,6 +11,37 @@ import { GetOverviewResponse } from "@workspace/api-zod";
 import { getCompanyId, requirePermission } from "../middleware/authz";
 
 const router: IRouter = Router();
+const monthFormatter = new Intl.DateTimeFormat("en-IN", { month: "short", timeZone: "Asia/Kolkata" });
+
+function monthlyProgressFromTransactions(txns: Array<typeof bankTransactionsTable.$inferSelect>) {
+  const grouped = new Map<string, { month: string; time: number; verified: number; unverified: number }>();
+
+  for (const txn of txns) {
+    const date = new Date(txn.date);
+    if (Number.isNaN(date.getTime())) continue;
+
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const existing = grouped.get(key) ?? {
+      month: monthFormatter.format(date),
+      time: new Date(date.getFullYear(), date.getMonth(), 1).getTime(),
+      verified: 0,
+      unverified: 0,
+    };
+
+    if (txn.status === "verified") {
+      existing.verified += 1;
+    } else {
+      existing.unverified += 1;
+    }
+
+    grouped.set(key, existing);
+  }
+
+  return [...grouped.values()]
+    .sort((a, b) => a.time - b.time)
+    .slice(-6)
+    .map(({ month, verified, unverified }) => ({ month, verified, unverified }));
+}
 
 router.get("/overview", requirePermission("overview.read"), async (req, res): Promise<void> => {
   const companyId = getCompanyId(req);
@@ -46,13 +77,7 @@ router.get("/overview", requirePermission("overview.read"), async (req, res): Pr
     riskByCategory[r.category].count++;
   }
 
-  const monthlyProgress = [
-    { month: "Jan", verified: 45, unverified: 12 },
-    { month: "Feb", verified: 52, unverified: 8 },
-    { month: "Mar", verified: 48, unverified: 15 },
-    { month: "Apr", verified: 55, unverified: 10 },
-    { month: "May", verified: verified, unverified: unverified },
-  ];
+  const monthlyProgress = monthlyProgressFromTransactions(txns);
 
   const recentUploads = uploads.map(u => ({
     id: u.id,

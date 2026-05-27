@@ -72,13 +72,13 @@ export default function TransactionsPage() {
       />
 
       <div className="mb-5 flex flex-wrap gap-3 rounded-2xl border border-border bg-card p-3">
-        <div className="relative min-w-56 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="fv-search-field min-w-56 flex-1">
+          <Search className="fv-search-icon" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search narration or reference..."
-            className="fv-input w-full pl-9"
+            className="fv-search-input"
           />
         </div>
         <select value={status} onChange={e => setStatus(e.target.value)} className="fv-input">
@@ -119,7 +119,7 @@ export default function TransactionsPage() {
                   <td>
                     <div className="font-medium">{t.narration}</div>
                     {t.reference && <div className="mt-0.5 font-mono text-xs text-muted-foreground">{t.reference}</div>}
-                    {t.note && <div className="mt-1 text-xs text-amber-700">{t.note}</div>}
+                    {t.note && <div className="fv-text-brand-accent mt-1 text-xs">{t.note}</div>}
                   </td>
                   <td className="text-muted-foreground">{t.bankName || t.source}</td>
                   <td className={`text-right font-mono font-semibold ${t.type === "credit" ? "text-success" : "text-foreground"}`}>

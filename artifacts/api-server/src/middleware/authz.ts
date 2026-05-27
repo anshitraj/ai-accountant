@@ -1,11 +1,13 @@
 import type { NextFunction, Request, Response } from "express";
 import { db } from "@workspace/db";
-import { auditLogsTable, rolePermissionsTable, usersTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { auditLogsTable, authSessionsTable, rolePermissionsTable, usersTable } from "@workspace/db";
+import { and, eq, gt, isNull } from "drizzle-orm";
+import { bearerToken, tokenHash, verifyAuthToken } from "../services/auth";
 
 export interface AuthContext {
   userId: number;
   companyId: number;
+  sessionId: number;
   email: string;
   role: string;
 }
@@ -18,31 +20,67 @@ declare global {
   }
 }
 
-function headerValue(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
 export async function attachAuthContext(req: Request, _res: Response, next: NextFunction) {
-  const userId = Number(headerValue(req.headers["x-finverify-user-id"]));
-  const companyId = Number(headerValue(req.headers["x-finverify-company-id"]));
-
-  if (Number.isFinite(userId) && Number.isFinite(companyId)) {
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-    if (user && user.companyId === companyId && user.status === "active") {
-      req.auth = {
-        userId: user.id,
-        companyId,
-        email: user.email,
-        role: user.role,
-      };
+  try {
+    const token = bearerToken(req.headers.authorization);
+    if (!token) {
+      next();
+      return;
     }
+
+    const payload = verifyAuthToken(token);
+    if (!payload) {
+      next();
+      return;
+    }
+
+    const [session] = await db.select().from(authSessionsTable).where(and(
+      eq(authSessionsTable.id, payload.sid),
+      eq(authSessionsTable.userId, payload.sub),
+      eq(authSessionsTable.companyId, payload.cid),
+      eq(authSessionsTable.tokenHash, tokenHash(token)),
+      gt(authSessionsTable.expiresAt, new Date()),
+      isNull(authSessionsTable.revokedAt),
+    )).limit(1);
+
+    if (!session) {
+      next();
+      return;
+    }
+
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, payload.sub)).limit(1);
+    if (!user || user.companyId !== payload.cid || user.status !== "active") {
+      next();
+      return;
+    }
+
+    req.auth = {
+      userId: user.id,
+      companyId: payload.cid,
+      sessionId: session.id,
+      email: user.email,
+      role: user.role,
+    };
+  } catch {
+    // Authentication failures should fall through to route-level 401s.
   }
 
   next();
 }
 
 export function getCompanyId(req: Request): number {
-  return req.auth?.companyId ?? 1;
+  if (!req.auth) {
+    throw new Error("Authenticated company context is required");
+  }
+  return req.auth.companyId;
+}
+
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.auth) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  next();
 }
 
 export function requirePermission(permission: string) {
@@ -78,10 +116,11 @@ export function requirePermission(permission: string) {
 }
 
 export async function auditAction(req: Request, action: string, entityType: string, entityId?: number | null, metadata?: Record<string, unknown>) {
+  if (!req.auth) return;
   await db.insert(auditLogsTable).values({
-    companyId: getCompanyId(req),
-    userId: req.auth?.userId ?? null,
-    actorEmail: req.auth?.email ?? "demo@finverify.local",
+    companyId: req.auth.companyId,
+    userId: req.auth.userId,
+    actorEmail: req.auth.email,
     action,
     entityType,
     entityId: entityId ?? null,

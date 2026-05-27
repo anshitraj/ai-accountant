@@ -7,15 +7,16 @@ import StatusBadge from "@/components/app/StatusBadge";
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
+      {/* Wordmark symbol follows the refreshed green/teal/orange FinVerify palette. */}
+      <div className="fv-brand-icon flex h-8 w-8 items-center justify-center rounded-xl shadow-sm">
         <CheckCircle className="h-4 w-4" />
       </div>
       {!compact && (
         <div className="leading-none">
           <div className="font-bold tracking-tight">
-            <span className="text-foreground">Fin</span>
-            <span className="text-primary">Verify</span>
-            <span className="ml-1 rounded-full border border-border bg-card px-1.5 py-0.5 text-[10px] font-bold text-foreground align-middle">
+            <span style={{ color: "var(--fv-brand-primary)" }}>Fin</span>
+            <span style={{ color: "var(--fv-brand-accent)" }}>Verify</span>
+            <span className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white align-middle" style={{ backgroundColor: "var(--fv-brand-secondary)" }}>
               OS
             </span>
           </div>
@@ -78,10 +79,10 @@ export function StatCard({
 }) {
   const toneClass = {
     default: "bg-muted text-muted-foreground",
-    success: "bg-emerald-50 text-emerald-700",
-    warning: "bg-amber-50 text-amber-700",
-    risk: "bg-red-50 text-red-700",
-    info: "bg-blue-50 text-blue-700",
+    success: "fv-status-verified",
+    warning: "fv-status-missing",
+    risk: "fv-status-risk",
+    info: "fv-status-review",
   }[tone];
 
   return (
@@ -101,7 +102,11 @@ export function StatCard({
 }
 
 export function MetricTrend({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "up" | "down" | "neutral" }) {
-  const className = tone === "up" ? "text-emerald-700 bg-emerald-50" : tone === "down" ? "text-red-700 bg-red-50" : "text-muted-foreground bg-muted";
+  const className = tone === "up"
+    ? "fv-status-verified"
+    : tone === "down"
+      ? "fv-status-risk"
+      : "text-muted-foreground bg-muted";
   return <span className={cn("rounded-full px-2 py-1 text-[11px] font-semibold", className)}>{label}: {value}</span>;
 }
 
@@ -195,6 +200,7 @@ export function UploadCard({
   formats,
   status,
   lastFile,
+  folderName,
   icon: Icon,
   onClick,
 }: {
@@ -202,10 +208,12 @@ export function UploadCard({
   formats: string;
   status: "Available now" | "Coming soon" | "Upload-based";
   lastFile?: string;
+  folderName?: string;
   icon: LucideIcon;
   onClick?: () => void;
 }) {
   const enabled = status !== "Coming soon";
+  const uploaded = Boolean(lastFile);
   return (
     <button
       type="button"
@@ -219,13 +227,24 @@ export function UploadCard({
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Icon className="h-5 w-5" />
         </div>
-        <span className={cn("rounded-full border px-2 py-1 text-[11px] font-semibold", enabled ? "border-blue-200 bg-blue-50 text-blue-700" : "border-amber-200 bg-amber-50 text-amber-700")}>
+        <span className={cn("rounded-full border px-2 py-1 text-[11px] font-semibold", enabled ? "fv-status-review" : "fv-status-missing")}>
           {status}
         </span>
       </div>
       <div className="font-semibold">{title}</div>
       <div className="mt-1 text-xs leading-5 text-muted-foreground">{formats}</div>
-      <div className="mt-auto pt-4 text-xs text-muted-foreground">{lastFile ? `Last file: ${lastFile}` : "No file uploaded yet"}</div>
+      <div className="mt-auto space-y-2 pt-4">
+        <span className={cn(
+          "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+          uploaded ? "fv-status-verified" : "border-destructive/25 bg-destructive/10 text-destructive"
+        )}>
+          {uploaded ? "Uploaded successfully" : "Not uploaded"}
+        </span>
+        <div className="text-xs leading-5 text-muted-foreground">
+          <div>Folder: {folderName ?? title}</div>
+          <div className="break-words">{lastFile ? `Last file: ${lastFile}` : "No file uploaded yet"}</div>
+        </div>
+      </div>
     </button>
   );
 }
@@ -244,10 +263,10 @@ export function IntegrationCard({
   icon: LucideIcon;
 }) {
   const statusClass = status === "Available" || status === "Available now"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    ? "fv-status-verified"
     : status === "Upload-based"
-      ? "border-blue-200 bg-blue-50 text-blue-700"
-      : "border-amber-200 bg-amber-50 text-amber-700";
+      ? "fv-status-review"
+      : "fv-status-missing";
 
   return (
     <div className="fv-card-flat p-5">

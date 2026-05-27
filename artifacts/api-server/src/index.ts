@@ -1,9 +1,13 @@
+import "./lib/env";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { validateServerEnv } from "./server/envValidation";
 
 const rawPort = process.env["PORT"] ?? "8080";
 
 const port = Number(rawPort);
+
+validateServerEnv();
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
