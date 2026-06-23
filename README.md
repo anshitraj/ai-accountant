@@ -26,7 +26,18 @@ The canonical high-level architecture is documented in [`ARCHITECTURE.md`](./ARC
 
 ## What Is Real
 
-- Navigable SaaS prototype with landing page, database-backed auth, app shell, dashboard, uploads, transactions, invoices, ledger matching, reconciliation, GST/TDS risk flags, payroll, gateway settlements, CA review, reports, integrations, and settings.
+- Navigable SaaS prototype with landing page, database-backed auth, app shell, dashboard, uploads, transactions, invoices, ledger matching, reconciliation, GST/TDS risk flags, payroll, gateway settlements, CA review, reports, integrations, settings, and docs.
+- **Month Close Command Center**: guided workflow on the Upload Center that determines current state and drives the user through the close sequence (import → extract → review → reconcile → exceptions → CA review → export).
+- **Route registry** (`src/lib/routes.ts`): all app routes defined in one place; `/app/ledger`, `/app/risks`, `/app/gateway`, `/app/review` redirect to canonical routes.
+- **Import All Parsed Files** (`POST /api/uploads/import-all-parsed`): batch re-import for all parsed upload batches with per-source row counts.
+- **Reconciliation Preflight** (`POST /api/reconciliation/preflight`): checks available data, returns blockers, warnings, and matching options before running reconciliation.
+- **Invoice Batch Extraction** (`POST /api/invoices/extract-batch`, `GET /api/invoices/extractions/pending`, `POST /api/invoices/extractions/bulk-action`): AI extraction for all pending invoice PDFs in one action.
+- **GST/TDS Review Generate** (`POST /api/gst-tds-review/generate`): creates risk flags and exceptions for unmatched GST records.
+- **Payroll Match** (`POST /api/payroll/match`): runs payroll-to-bank matching and creates exceptions for mismatches.
+- **Gateway Match** (`POST /api/gateway-settlements/match`): runs gateway-to-bank matching and creates exceptions for mismatches.
+- **Exceptions and Document Requests** (`GET/POST /api/exceptions`, resolve, dismiss, send-to-ca-review; `GET/POST /api/document-requests`, resolve).
+- **CA Pack Export** (`POST /api/reports/export-ca-pack`): generates full CA-ready pack with blockers check.
+- **Docs page** (`/app/docs`): in-app documentation covering workflow, upload flow, AI rules, reconciliation, and limitations.
 - Rule-based matching functions for bank-to-invoice, bank-to-ledger, duplicate detection, partial/split payments, gateway settlement checks, payroll checks, and risk flag generation.
 - CSV export flow for transactions, invoices, risks, payroll, and report data.
 - Server-side CSV, Excel, and PDF parsing for row counts, detected columns, sheet/page metadata, text previews, and audit logging.

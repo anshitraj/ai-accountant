@@ -1,0 +1,111 @@
+version: "3.9"
+
+# FinVerify OS — Docker Compose
+# Runs all services: frontend, TypeScript API fallback, Go API gateway, Python extraction worker, Postgres.
+#
+# Quick start:
+#   docker-compose up
+#
+# Or individual services:
+#   docker-compose up typescript-api python-worker go-api
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finverify
+      POSTGRES_PASSWORD: finverify_local
+      POSTGRES_DB: finverify
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finverify"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── TypeScript API fallback ────────────────────────────────────────────────
+  typescript-api:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgresql://finverify:finverify_local@postgres:5432/finverify
+      PYTHON_WORKER_URL: http://python-worker:8091
+      STORAGE_PROVIDER: metadata_only
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Python extraction worker ──────────────────────────────────────────────
+  python-worker:
+    build:
+      context: services/extraction-worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8091:8091"
+    environment:
+      PYTHON_WORKER_PORT: 8091
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8091/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Go API gateway ────────────────────────────────────────────────────────
+  go-api:
+    build:
+      context: services/api-go
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      GO_API_PORT: 8090
+      TYPESCRIPT_API_URL: http://typescript-api:8080
+      PYTHON_WORKER_URL: http://python-worker:8091
+      DATABASE_URL: postgresql://finverify:finverify_local@postgres:5432/finverify
+    env_file:
+      - .env
+    depends_on:
+      typescript-api:
+        condition: service_healthy
+      python-worker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8090/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── React/Vite frontend ───────────────────────────────────────────────────
+  frontend:
+    build:
+      context: artifacts/finverify-os
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - go-api
+
+volumes:
+  postgres_data:

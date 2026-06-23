@@ -1,12 +1,17 @@
 import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Plus, Table2, Landmark, ReceiptText, BookOpen, BadgeIndianRupee, Users, CreditCard, WalletCards } from "lucide-react";
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Plus, Settings2, ChevronUp } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
 import StatusBadge from "@/components/app/StatusBadge";
-import { PageTransition, UploadCard } from "@/components/app/finverify-ui";
-import { formatDate } from "@/lib/format";
+import { PageTransition } from "@/components/app/finverify-ui";
+import { formatDateTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import SmartNextStepPanel from "@/components/uploads/SmartNextStepPanel";
+import ActionHistory from "@/components/workflow/ActionHistory";
+import ProcessingSteps from "@/components/workflow/ProcessingSteps";
+import AdvancedUploadView from "@/components/uploads/AdvancedUploadView";
+import CurrentUploadedFiles from "@/components/uploads/CurrentUploadedFiles";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -122,6 +127,19 @@ const SOURCE_TYPES = [
   { value: "expenses", label: "Expense Sheet" },
 ];
 
+function autoDetectSourceType(fileName: string): string {
+  const n = fileName.toLowerCase();
+  if (/bank|statement|hdfc|icici|sbi|kotak|axis|txn|transaction/.test(n)) return "bank";
+  if (/invoice|inv[-_]|bill|receipt/.test(n)) return "invoices";
+  if (/tally|ledger|voucher|daybook/.test(n)) return "tally";
+  if (/zoho|crm/.test(n)) return "zoho";
+  if (/gst|tds|2b|3b|gstr/.test(n)) return "gst";
+  if (/payroll|salary|salary.reg|ctc/.test(n)) return "payroll";
+  if (/gateway|razorpay|cashfree|stripe|settlement/.test(n)) return "gateway";
+  if (/expense|reimburse/.test(n)) return "expenses";
+  return "bank";
+}
+
 const EXTRACTION_STAGES = [
   "Reading parsed text",
   "Sending schema to provider",
@@ -129,6 +147,17 @@ const EXTRACTION_STAGES = [
   "Validating JSON",
   "Saving pending review",
 ];
+
+async function readUploadBatches(response: Response): Promise<UploadBatch[]> {
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.error || `Uploads request failed: ${response.status}`);
+  }
+  if (!Array.isArray(data)) {
+    throw new Error("Uploads response was not a list.");
+  }
+  return data;
+}
 
 async function inspectFile(file: File, activeSourceType: string): Promise<MappingPreview> {
   const extension = file.name.split(".").pop()?.toLowerCase();
@@ -271,9 +300,15 @@ export default function UploadsPage() {
   const [aiProgress, setAiProgress] = useState(0);
   const [aiStageIndex, setAiStageIndex] = useState(0);
   const [pendingAction, setPendingAction] = useState<ExtractionAction>(null);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const pendingSourceTypeRef = useRef(sourceType);
+  // Session-scoped upload run ID — groups files uploaded in the same session.
+  // Resets on new page load, or when the user explicitly starts a new session.
+  const runIdRef = useRef<string>(crypto.randomUUID());
+  const resetRunId = () => { runIdRef.current = crypto.randomUUID(); };
 
   useEffect(() => () => {
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
@@ -293,9 +328,9 @@ export default function UploadsPage() {
     return () => window.clearInterval(timer);
   }, [aiLoading]);
 
-  const { data = [], isLoading } = useQuery<UploadBatch[]>({
+  const { data = [], isLoading, isError, error, refetch } = useQuery<UploadBatch[], Error>({
     queryKey: ["uploads"],
-    queryFn: () => fetch(`${BASE}/api/uploads`).then(r => r.json()),
+    queryFn: () => fetch(`${BASE}/api/uploads`).then(readUploadBatches),
   });
 
   const uploadMutation = useMutation({
@@ -306,6 +341,7 @@ export default function UploadsPage() {
       fd.append("file", file);
       fd.append("sourceType", activeSourceType);
       fd.append("enableAiExtraction", "false");
+      fd.append("runId", runIdRef.current);
       const res = await fetch(`${BASE}/api/uploads`, {
         method: "POST",
         body: fd,
@@ -374,13 +410,37 @@ export default function UploadsPage() {
         processingStatus: "Upload failed",
         processingTone: "error",
       } : current);
-      setMessage(error instanceof Error ? `Upload failed: ${error.message}` : "Upload failed. Please try again.");
+      const msg = error instanceof Error ? error.message : "Upload failed. Please try again.";
+      setMessage(msg);
       setMessageTone("error");
+      toast({
+        title: "Upload rejected",
+        description: msg,
+        variant: "destructive",
+      });
       setUploading(false);
     },
   });
 
+  const PDF_BLOCKED_SOURCES = new Set(["bank", "tally", "zoho", "gst", "tds", "payroll", "gateway", "expenses"]);
+
+  function preflightFile(file: File, activeSourceType: string): string | null {
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if ((ext === "pdf" || file.type === "application/pdf") && PDF_BLOCKED_SOURCES.has(activeSourceType.toLowerCase())) {
+      const label = SOURCE_TYPES.find(s => s.value === activeSourceType)?.label ?? activeSourceType;
+      return `PDF not supported for ${label}. Export this file from your bank/portal as CSV or Excel and re-upload. Only invoice PDFs are accepted (via AI extraction).`;
+    }
+    return null;
+  }
+
   const handleFile = (file: File, activeSourceType = sourceType) => {
+    const reject = preflightFile(file, activeSourceType);
+    if (reject) {
+      setMessage(reject);
+      setMessageTone("error");
+      toast({ title: "Upload blocked — wrong format", description: reject, variant: "destructive" });
+      return;
+    }
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
@@ -489,7 +549,10 @@ export default function UploadsPage() {
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files, sourceType);
+    if (e.dataTransfer.files?.length) {
+      const files = Array.from(e.dataTransfer.files);
+      files.forEach(f => handleFile(f, autoDetectSourceType(f.name)));
+    }
   };
 
   const statusIcon = (status: string) => {
@@ -499,68 +562,37 @@ export default function UploadsPage() {
     return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
   };
 
-  const uploadCards = [
-    { source: "bank", title: "Bank Statement", formats: "CSV, Excel, PDF statement exports", icon: Landmark, status: "Available now" as const },
-    { source: "invoices", title: "Invoices", formats: "CSV, Excel, PDF, JPG, PNG", icon: ReceiptText, status: "Available now" as const },
-    { source: "tally", title: "Tally Export", formats: "Excel or CSV ledger/voucher export", icon: BookOpen, status: "Upload-based" as const },
-    { source: "zoho", title: "Zoho Export", formats: "Excel or CSV invoice/bill export", icon: FileText, status: "Upload-based" as const },
-    { source: "gst", title: "GST/TDS", formats: "GST 2B/3B and TDS sheets", icon: BadgeIndianRupee, status: "Upload-based" as const },
-    { source: "payroll", title: "Payroll", formats: "Salary register CSV or Excel", icon: Users, status: "Available now" as const },
-    { source: "gateway", title: "Gateway Settlements", formats: "Razorpay, Cashfree, Stripe CSV exports", icon: CreditCard, status: "Upload-based" as const },
-    { source: "expenses", title: "Expenses", formats: "Expense sheet CSV, Excel, PDF", icon: WalletCards, status: "Available now" as const },
-  ];
+  const visibleUploads = showAllHistory ? data : data.slice(0, 5);
 
   return (
     <PageTransition className="mx-auto max-w-6xl">
-      <PageHeader title="Upload Center" subtitle="Upload finance files for rule-based parsing, mapping, and verification" />
+      <PageHeader title="Upload Center" subtitle="Upload any finance file — FinVerify detects the source type automatically" />
 
-      <div className="fv-status-review mb-6 rounded-2xl border p-4 text-sm leading-6">
-        <strong>Upload parsing:</strong> CSV, Excel, and PDF files are parsed server-side for row counts, columns, sheet/page metadata, and text previews. Images are stored as metadata until OCR is configured. No direct bank, GST, Tally, or gateway connection is live in this prototype.
-      </div>
-
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {uploadCards.map(card => {
-          const last = data.find(item => item.sourceType === card.source);
-          return (
-            <UploadCard
-              key={card.source}
-              title={card.title}
-              formats={card.formats}
-              status={card.status}
-              icon={card.icon}
-              lastFile={last?.fileName}
-              folderName={uploadFolderName(card.source)}
-              onClick={() => {
-                selectSourceType(card.source);
-                fileRef.current?.click();
-              }}
-            />
-          );
-        })}
-      </div>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        {SOURCE_TYPES.map(t => (
-          <button
-            key={t.value}
-            onClick={() => selectSourceType(t.value)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-              sourceType === t.value
-                ? "fv-brand-accent-bg fv-border-brand-accent"
-                : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
-            }`}
-          >
-            {t.label}
+      {isError && (
+        <div className="fv-card-flat mb-6 flex flex-wrap items-center justify-between gap-3 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <div>
+              <div className="text-sm font-semibold text-foreground">Uploads could not be loaded</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {error.message || "Check that you are signed in and the API is reachable."}
+              </div>
+            </div>
+          </div>
+          <button type="button" onClick={() => refetch()} className="fv-button-secondary">
+            Retry
           </button>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {/* ── PRIMARY UPLOAD ZONE ── */}
       <motion.div
         animate={{ scale: dragging ? 1.01 : 1 }}
         onDragOver={e => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         onClick={() => fileRef.current?.click()}
-        className={`mb-6 cursor-pointer rounded-2xl border-2 border-dashed p-10 text-center transition-colors sm:p-12 ${
+        className={`mb-6 cursor-pointer rounded-2xl border-2 border-dashed transition-colors ${
           dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/30"
         }`}
       >
@@ -571,14 +603,19 @@ export default function UploadsPage() {
           accept=".csv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg"
           className="hidden"
           onChange={e => {
-            if (e.target.files?.length) handleFiles(e.target.files, pendingSourceTypeRef.current);
+            if (e.target.files?.length) {
+              const files = Array.from(e.target.files);
+              files.forEach(f => handleFile(f, autoDetectSourceType(f.name)));
+            }
             e.currentTarget.value = "";
           }}
         />
         {selectedFilePreview ? (
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-64 rounded-xl border border-border bg-card p-4 shadow-sm">
-              <div className="overflow-hidden rounded-lg border border-border bg-background" style={{ height: 226 }}>
+          /* ── Post-upload state: show thumbnail left, "upload more" right ── */
+          <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between">
+            {/* Compact file thumbnail */}
+            <div className="flex items-center gap-4">
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-background">
                 {selectedFilePreview.kind === "pdf" ? (
                   <iframe
                     title={`Preview of ${selectedFilePreview.name}`}
@@ -594,43 +631,68 @@ export default function UploadsPage() {
                     style={{ pointerEvents: "none" }}
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-muted/50">
-                    <FileText className="h-10 w-10 text-muted-foreground/70" />
+                  <div className="flex h-full w-full items-center justify-center bg-muted/40">
+                    <FileText className="h-7 w-7 text-muted-foreground/60" />
                   </div>
                 )}
               </div>
-              <div className="mt-3 truncate text-center text-sm font-medium text-foreground" title={selectedFilePreview.name}>
-                {selectedFilePreview.name}
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-foreground" title={selectedFilePreview.name}>
+                  {selectedFilePreview.name}
+                </div>
+                {uploading ? (
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                    Detecting source type and parsing...
+                  </div>
+                ) : (
+                  <div className="mt-1 text-xs text-success">Uploaded successfully</div>
+                )}
               </div>
             </div>
-            {uploading && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                Inspecting and capturing metadata...
-              </div>
-            )}
+            {/* Upload more */}
+            <div className="flex shrink-0 flex-col items-center gap-3 text-center sm:items-end">
+              <button
+                type="button"
+                className="fv-button-primary"
+                onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}
+              >
+                <Plus className="h-4 w-4" />
+                Upload Another File
+              </button>
+              <div className="text-xs text-muted-foreground">CSV · Excel · PDF · Image</div>
+            </div>
           </div>
         ) : uploading ? (
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-3 p-12">
             <Loader2 className="w-10 h-10 text-primary animate-spin" />
-            <div className="text-sm text-muted-foreground">Inspecting and capturing metadata...</div>
+            <div className="text-sm text-muted-foreground">Detecting source type and parsing...</div>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Upload className="w-6 h-6 text-primary" />
+          <div className="flex flex-col items-center gap-4 px-8 py-12 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+              <Upload className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <div className="font-medium text-sm">Drop files here or click to browse</div>
-              <div className="text-xs text-muted-foreground mt-1">CSV, Excel, PDF, or image. CSV/Excel/PDF get server-side parsing.</div>
+              <div className="text-base font-semibold text-foreground">Drop any finance file here</div>
+              <div className="mt-1.5 text-sm text-muted-foreground">
+                FinVerify will automatically detect the source type — Bank Statement, Invoice, Tally Export, GST, Payroll, and more.
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">CSV · Excel · PDF · Image (JPG, PNG)</div>
             </div>
-            <button className="fv-button-primary mt-1">
+            <button type="button" className="fv-button-primary mt-1" onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}>
               <Plus className="w-4 h-4" />
-              Select {SOURCE_TYPES.find(t => t.value === sourceType)?.label}
+              Upload File
             </button>
           </div>
         )}
       </motion.div>
+
+      <ProcessingSteps kind="upload" active={uploading} title="Uploading and parsing..." />
+
+      <CurrentUploadedFiles />
+
+      <SmartNextStepPanel />
 
       {message && (
         <motion.div
@@ -642,255 +704,71 @@ export default function UploadsPage() {
         </motion.div>
       )}
 
-      {preview && (
+      {preview && !showAdvanced && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           className="fv-card-flat mb-6 p-5"
         >
-          <div className="flex items-center gap-2 text-sm font-semibold mb-3">
-            <Table2 className="w-4 h-4 text-primary" />
-            Mapping Preview
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-foreground">Just uploaded</div>
+              <div className="mt-1 text-xs text-muted-foreground truncate" title={preview.fileName}>
+                <span className="font-medium text-foreground">{preview.fileName}</span> · {sourceLabel(preview.sourceType)} · <span className={processingClasses(preview.processingTone)}>{preview.processingStatus}</span>
+              </div>
+            </div>
+            <button type="button" onClick={() => setShowAdvanced(true)} className="fv-button-secondary">
+              <Settings2 className="h-4 w-4" />
+              Open Advanced Upload View
+            </button>
           </div>
-          <div className="grid md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <div className="text-xs text-muted-foreground">File</div>
-              <div className="font-medium">{preview.fileName}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">Folder</div>
-              <div className="font-medium">{uploadFolderName(preview.sourceType)}</div>
-            </div>
-            {preview.parser === "pdf" ? (
-              <>
-                <div>
-                  <div className="text-xs text-muted-foreground">PDF pages</div>
-                  <div className="font-medium">{preview.pageCount ?? "Needs review"}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Extracted text</div>
-                  <div className="font-medium">{preview.textLength ?? preview.textPreview?.length ?? 0} characters</div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <div className="text-xs text-muted-foreground">Parsed rows</div>
-                  <div className="font-medium">{preview.rowCount}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Detected columns</div>
-                  <div className="font-medium">{preview.detectedColumns.length}</div>
-                </div>
-              </>
-            )}
-            <div>
-              <div className="text-xs text-muted-foreground">Processing status</div>
-              <div className={`font-medium ${processingClasses(preview.processingTone)}`}>{preview.processingStatus}</div>
-            </div>
-            {preview.parser === "pdf" && (
-              <>
-                <div>
-                  <div className="text-xs text-muted-foreground">Tables detected</div>
-                  <div className="font-medium">{preview.tablesDetected ?? 0}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">AI extraction status</div>
-                  <div className="font-medium">{aiExtraction ? (aiExtraction.reviewLabel ?? "AI extracted — pending review") : "Not run"}</div>
-                </div>
-              </>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground mt-3">{preview.mode}</p>
-          {preview.sheetNames && preview.sheetNames.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-2">Sheets: {preview.sheetNames.join(", ")}</p>
-          )}
-          {preview.pageCount && (
-            <p className="text-xs text-muted-foreground mt-2">PDF pages: {preview.pageCount}</p>
-          )}
-          {preview.detectedColumns.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {preview.detectedColumns.map(column => (
-                <span key={column} className="px-2 py-1 rounded-md bg-muted text-xs text-muted-foreground border border-border">
-                  {column}
-                </span>
-              ))}
-            </div>
-          )}
-          {preview.textPreview && (
-            <div className="mt-3 p-3 rounded-lg bg-muted/40 border border-border">
-              <div className="text-xs font-medium mb-1">Text preview</div>
-              <p className="text-xs text-muted-foreground line-clamp-4">{preview.textPreview}</p>
-            </div>
-          )}
-          {preview.notes && preview.notes.length > 0 && (
-            <div className="mt-3 space-y-1">
-              {preview.notes.map(note => <p key={note} className="text-xs text-muted-foreground">{note}</p>)}
-            </div>
-          )}
-          {preview.imported && (
-            <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
-              <div className="text-sm font-semibold">Import result</div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full border border-border bg-background px-2.5 py-1">
-                  Rows imported: {preview.imported.inserted}
-                </span>
-                {preview.imported.table && (
-                  <span className="rounded-full border border-border bg-background px-2.5 py-1">
-                    Destination: {preview.imported.table.replace(/_/g, " ")}
-                  </span>
-                )}
-                {preview.reconciliation && (
-                  <span className="rounded-full border border-border bg-background px-2.5 py-1">
-                    New matches: {preview.reconciliation.matchesFound}
-                  </span>
-                )}
-              </div>
-              {preview.imported.notes.map(note => <p key={note} className="mt-2 text-xs text-muted-foreground">{note}</p>)}
-            </div>
-          )}
-          {supportsInvoiceExtraction(preview.sourceType) ? (
-          <div className="mt-5 rounded-xl border border-border bg-card p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold">AI Extraction</div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {aiExtraction
-                    ? "Review extracted invoice fields before accepting them for reconciliation."
-                    : "Extract invoice fields from the parsed text using Gemini. Results stay pending until you review them."}
-                </p>
-              </div>
-              {!aiExtraction && (
-                <button type="button" onClick={runAiExtraction} disabled={aiLoading || !preview.uploadId || !preview.textPreview} className="fv-button-primary">
-                  {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ReceiptText className="h-4 w-4" />}
-                  {aiLoading ? `Running ${aiProgress}%` : "Run AI Extraction"}
-                </button>
-              )}
-            </div>
-            {aiLoading && (
-              <div className="mt-4 overflow-hidden rounded-xl border border-primary/20 bg-background p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">Running extraction</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{EXTRACTION_STAGES[aiStageIndex]}</div>
-                  </div>
-                  <div className="relative flex h-14 w-14 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
-                    <motion.div
-                      className="absolute inset-1 rounded-full border-2 border-primary border-t-transparent"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
-                    />
-                    <span className="text-xs font-bold text-primary">{aiProgress}%</span>
-                  </div>
-                </div>
-                <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-muted">
-                  <motion.div
-                    className="h-full rounded-full bg-primary"
-                    animate={{ width: `${aiProgress}%` }}
-                    transition={{ type: "spring", stiffness: 90, damping: 18 }}
-                  />
-                </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-5">
-                  {EXTRACTION_STAGES.map((stage, index) => (
-                    <div
-                      key={stage}
-                      className={`rounded-lg border px-2 py-2 text-[11px] font-medium ${
-                        index <= aiStageIndex
-                          ? "border-primary/30 bg-primary/10 text-primary"
-                          : "border-border bg-muted/30 text-muted-foreground"
-                      }`}
-                    >
-                      {stage}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {aiError && (
-              <div className="mt-4 rounded-lg border border-warning/20 bg-warning/10 p-3 text-sm text-warning">
-                {aiError === "No extracted text available. OCR required." ? aiError : "AI extraction failed. Rule-based extraction is available."}
-                <button type="button" onClick={runAiExtraction} className="ml-3 font-semibold underline">Use rule-based extraction</button>
-              </div>
-            )}
-            {aiExtraction && (
-              <div className="mt-4 space-y-4">
-                <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                  <span className="fv-status-review">AI extracted — pending review</span>
-                  {aiExtraction.confidence < 0.75 && <span className="fv-status-missing">Needs review</span>}
-                  <span className="rounded-full border border-border px-2.5 py-1">Provider: {extractionProviderLabel(aiExtraction.provider)}</span>
-                  {aiExtraction.usedFallback && <span className="rounded-full border border-border px-2.5 py-1">Fallback used: {extractionProviderLabel(aiExtraction.provider)}</span>}
-                  {aiExtraction.model && <span className="rounded-full border border-border px-2.5 py-1">Model: {aiExtraction.model}</span>}
-                  <span className="rounded-full border border-border px-2.5 py-1">Confidence: {Math.round(aiExtraction.confidence * 100)}%</span>
-                </div>
-                {aiExtraction.confidence < 0.75 && (
-                  <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 text-xs text-warning">
-                    Low confidence extraction — please review before accepting.
-                  </div>
-                )}
-                <div className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3">
-                  {[
-                    ["Invoice No", aiExtraction.data?.invoiceNumber],
-                    ["Date", aiExtraction.data?.invoiceDate],
-                    ["Vendor", aiExtraction.data?.vendorName],
-                    ["Customer", aiExtraction.data?.customerName],
-                    ["Vendor GSTIN", aiExtraction.data?.vendorGstin],
-                    ["Customer GSTIN", aiExtraction.data?.customerGstin],
-                    ["Subtotal", aiExtraction.data?.subtotalAmount],
-                    ["GST", aiExtraction.data?.gstAmount],
-                    ["Total", aiExtraction.data?.totalAmount],
-                    ["Currency", aiExtraction.data?.currency],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-lg border border-border bg-background p-3">
-                      <div className="text-xs text-muted-foreground">{label}</div>
-                      <div className="mt-1 font-medium">{displayValue(value)}</div>
-                    </div>
-                  ))}
-                </div>
-                {aiExtraction.data?.missingFields && aiExtraction.data.missingFields.length > 0 && (
-                  <p className="text-xs text-muted-foreground">Missing fields: {aiExtraction.data.missingFields.join(", ")}</p>
-                )}
-                {aiExtraction.data?.warnings && aiExtraction.data.warnings.length > 0 && (
-                  <div className="space-y-1">
-                    {aiExtraction.data.warnings.map(warning => <p key={warning} className="text-xs text-warning">{warning}</p>)}
-                  </div>
-                )}
-                {aiExtraction.data?.sourceQuotes && aiExtraction.data.sourceQuotes.length > 0 && (
-                  <div className="rounded-lg border border-border bg-muted/30 p-3">
-                    <div className="mb-2 text-xs font-semibold">Source quotes</div>
-                    <div className="space-y-1">
-                      {aiExtraction.data.sourceQuotes.slice(0, 4).map(quote => <p key={quote} className="text-xs text-muted-foreground">{quote}</p>)}
-                    </div>
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => updateExtractionStatus("accept")} disabled={pendingAction !== null || aiExtraction.status === "accepted"} className="fv-button-primary">
-                    {pendingAction === "accept" && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {aiExtraction.status === "accepted" ? "Accepted for reconciliation" : "Accept extraction"}
-                  </button>
-                  <button type="button" disabled className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground">Edit fields</button>
-                  <button type="button" onClick={() => updateExtractionStatus("reject")} disabled={pendingAction !== null || aiExtraction.status === "rejected"} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:border-primary/40">
-                    {pendingAction === "reject" && <Loader2 className="mr-1 inline h-4 w-4 animate-spin" />}
-                    {aiExtraction.status === "rejected" ? "Rejected" : "Reject"}
-                  </button>
-                  <button type="button" disabled className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground">Send to CA review</button>
-                </div>
-              </div>
-            )}
-          </div>
-          ) : (
-            <div className="mt-5 rounded-xl border border-border bg-card p-4">
-              <div className="text-sm font-semibold">Document workflow</div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {sourceLabel(preview.sourceType)} uploads are parsed into their matching records for rule-based reconciliation. Invoice field extraction is only available for invoice uploads.
-              </p>
-            </div>
-          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Parsed rows, extracted text, detected columns, AI extraction, and reprocess options are kept under Advanced. Use the Smart Next Step panel above to act on this file.
+          </p>
         </motion.div>
       )}
 
+      {preview && showAdvanced && (
+        <div className="mb-2 flex items-center justify-end">
+          <button type="button" onClick={() => setShowAdvanced(false)} className="fv-button-secondary">
+            <ChevronUp className="h-4 w-4" />
+            Hide Advanced Upload View
+          </button>
+        </div>
+      )}
+
+      {preview && showAdvanced && (
+        <AdvancedUploadView
+          preview={preview}
+          aiExtraction={aiExtraction}
+          aiLoading={aiLoading}
+          aiError={aiError}
+          aiProgress={aiProgress}
+          aiStageIndex={aiStageIndex}
+          pendingAction={pendingAction}
+          onRunAi={runAiExtraction}
+          onAcceptAi={() => updateExtractionStatus("accept")}
+          onRejectAi={() => updateExtractionStatus("reject")}
+          onAiExtractionUpdate={(next) => {
+            setAiExtraction(next);
+            setPreview(current => current ? { ...current, aiExtraction: next } : current);
+            toast({ title: "Edits saved", description: "AI extraction updated — still pending review." });
+          }}
+          sourceLabel={sourceLabel}
+          uploadFolderName={uploadFolderName}
+          supportsInvoiceExtraction={supportsInvoiceExtraction}
+        />
+      )}
+
+
+      <ActionHistory />
+
       <div className="fv-card-flat overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <div className="text-sm font-semibold">Upload History</div>
+          <div>
+            <div className="text-sm font-semibold">Upload History</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Immutable file audit trail. Workflow actions live above.</div>
+          </div>
           <div className="text-xs text-muted-foreground">{data.length} files</div>
         </div>
         {isLoading ? (
@@ -902,14 +780,14 @@ export default function UploadsPage() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {data.map(u => (
+            {visibleUploads.map(u => (
               <div key={u.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-muted/20 transition-colors">
                 <div className="flex items-center gap-3">
                   {statusIcon(u.status)}
                   <div>
                     <div className="text-sm font-medium">{u.fileName}</div>
                     <div className="text-xs text-muted-foreground">
-                      {SOURCE_TYPES.find(t => t.value === u.sourceType)?.label || u.sourceType} - {formatDate(u.uploadedAt)}
+                      {SOURCE_TYPES.find(t => t.value === u.sourceType)?.label || u.sourceType} - Uploaded {formatDateTime(u.uploadedAt)}
                     </div>
                   </div>
                 </div>
@@ -919,6 +797,13 @@ export default function UploadsPage() {
                 </div>
               </div>
             ))}
+            {data.length > 5 && (
+              <div className="px-5 py-4">
+                <button type="button" onClick={() => setShowAllHistory(current => !current)} className="fv-button-secondary w-full justify-center">
+                  {showAllHistory ? "Show latest 5 uploads" : "Show all upload history"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

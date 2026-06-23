@@ -3,24 +3,19 @@ import { useLocation } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
-  ArrowLeftRight,
-  BarChart3,
   Bell,
+  BookOpen,
+  Calendar,
   CheckSquare,
   ChevronLeft,
-  ClipboardList,
-  CreditCard,
-  FileText,
-  GitMerge,
+  ClipboardCheck,
   LayoutDashboard,
   LogOut,
   Menu,
   Puzzle,
-  Search,
   Settings,
   ShieldCheck,
   Upload,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import { BrandMark } from "@/components/app/finverify-ui";
@@ -30,45 +25,41 @@ import { cn } from "@/lib/utils";
 
 const navGroups = [
   {
-    label: "Control room",
+    label: "Home",
     items: [
       { label: "Overview", href: "/app/overview", icon: LayoutDashboard },
-      { label: "Upload Center", href: "/app/uploads", icon: Upload },
+      { label: "Upload", href: "/app/uploads", icon: Upload },
     ],
   },
   {
-    label: "Financials",
+    label: "Work",
     items: [
-      { label: "Transactions", href: "/app/transactions", icon: ArrowLeftRight },
-      { label: "Invoices", href: "/app/invoices", icon: FileText },
-      { label: "Ledger Match", href: "/app/ledger-match", icon: GitMerge },
-    ],
-  },
-  {
-    label: "Verification",
-    items: [
-      { label: "Reconciliation", href: "/app/reconciliation", icon: CheckSquare },
-      { label: "GST / TDS Risks", href: "/app/gst-tds-risks", icon: AlertTriangle },
-      { label: "Payroll", href: "/app/payroll", icon: Users },
-      { label: "Gateway Settlements", href: "/app/gateway-settlements", icon: CreditCard },
-    ],
-  },
-  {
-    label: "CA workflow",
-    items: [
-      { label: "CA Review Queue", href: "/app/ca-review", icon: ClipboardList },
-      { label: "Reports", href: "/app/reports", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "Workspace",
-    items: [
-      { label: "Admin Dashboard", href: "/app/admin", icon: ShieldCheck },
-      { label: "Integrations", href: "/app/integrations", icon: Puzzle },
+      { label: "Verify", href: "/app/verify", icon: CheckSquare },
+      { label: "Action Items", href: "/app/action-items", icon: ClipboardCheck },
       { label: "Settings", href: "/app/settings", icon: Settings },
     ],
   },
 ] as const;
+
+/** Current active FY month — shown instead of cryptic WorkspacePill. */
+function MonthSelector() {
+  const months = [
+    "April 2026", "March 2026", "February 2026", "January 2026",
+    "December 2025", "November 2025", "October 2025",
+  ];
+  const [selected, setSelected] = useState(months[0]);
+  return (
+    <select
+      aria-label="Active month"
+      value={selected}
+      onChange={e => setSelected(e.target.value)}
+      className="hidden h-8 cursor-pointer items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/20 md:inline-flex"
+    >
+      {months.map(m => <option key={m} value={m}>{m}</option>)}
+    </select>
+  );
+}
+
 
 const notifications: Array<{
   title: string;
@@ -237,6 +228,7 @@ export default function AppShell({ children }: AppShellProps) {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <MonthSelector />
             <select aria-label="Company switcher" className="fv-input hidden w-48 md:block">
               <option>{user.company}</option>
             </select>
@@ -310,8 +302,8 @@ export default function AppShell({ children }: AppShellProps) {
                   })}
                 </div>
                 <div className="flex items-center justify-between border-t border-border px-4 py-3">
-                  <button type="button" onClick={() => navigate("/app/ca-review")} className="text-xs font-semibold text-primary hover:underline">
-                    Open CA queue
+                  <button type="button" onClick={() => navigate("/app/action-items")} className="text-xs font-semibold text-primary hover:underline">
+                    Open Action Items
                   </button>
                   <button type="button" onClick={() => navigate("/app/settings")} className="text-xs font-medium text-muted-foreground hover:text-foreground">
                     Notification settings

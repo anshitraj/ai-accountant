@@ -10,13 +10,21 @@ const ToastProvider = ToastPrimitives.Provider
 const ToastViewport = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Viewport>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Viewport>
->(({ className, ...props }, ref) => (
+>(({ className, style, ...props }, ref) => (
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      "flex max-h-screen flex-col-reverse sm:flex-col",
       className
     )}
+    style={{
+      position: "fixed",
+      zIndex: 100,
+      top: "1rem",
+      right: "1rem",
+      width: "min(calc(100vw - 2rem), 420px)",
+      ...style,
+    }}
     {...props}
   />
 ))

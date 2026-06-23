@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
-import { db, pool } from "@workspace/db";
+import { db } from "@workspace/db";
 
-export { db, pool };
+export { db };
 
 export async function validateDatabaseConnection(): Promise<"ok" | "error"> {
   try {

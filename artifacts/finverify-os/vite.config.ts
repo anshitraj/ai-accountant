@@ -53,7 +53,7 @@ export default defineConfig({
       overlay: false,
     },
     proxy: {
-      "/api": "http://localhost:8080",
+      "/api": "http://localhost:8090",
     },
     fs: {
       strict: true,

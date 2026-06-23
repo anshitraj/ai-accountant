@@ -171,6 +171,87 @@
     @apply border-y border-border bg-card;
   }
 
+  .fv-login-shell {
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
+    display: flex;
+    background: hsl(var(--background));
+  }
+
+  .fv-login-brand-panel {
+    display: none;
+    min-width: 0;
+    background: var(--fv-brand-primary);
+    color: #fff;
+  }
+
+  .fv-login-form-panel {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+
+  .fv-login-form-card {
+    width: 100%;
+    max-width: 28rem;
+  }
+
+  @media (min-width: 64rem) {
+    .fv-login-brand-panel {
+      display: flex;
+      width: 50%;
+      flex: 0 0 50%;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 3rem;
+    }
+
+    .fv-login-form-panel {
+      width: 50%;
+      flex: 0 0 50%;
+    }
+  }
+
+  .fv-content-modal-overlay {
+    position: fixed;
+    inset-block: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 1rem;
+  }
+
+  @media (min-width: 64rem) {
+    .fv-content-modal-overlay {
+      left: 16rem;
+    }
+  }
+
+  .fv-modal-panel-sm,
+  .fv-modal-panel-lg {
+    width: 100%;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-2xl);
+    background: hsl(var(--card));
+    box-shadow: 0 24px 80px rgba(16, 24, 40, 0.14);
+  }
+
+  .fv-modal-panel-sm {
+    max-width: 28rem;
+  }
+
+  .fv-modal-panel-lg {
+    max-width: 42rem;
+  }
+
   .fv-brand-icon {
     background: var(--fv-brand-primary);
     color: #fff;

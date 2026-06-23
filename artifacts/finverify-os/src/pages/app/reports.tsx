@@ -1,3 +1,4 @@
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Download, FileText, BarChart3, AlertTriangle, Users, CreditCard } from "lucide-react";
@@ -31,38 +32,51 @@ export default function ReportsPage() {
     queryFn: () => fetch(`${BASE}/api/reports/summary`).then(r => r.json()),
   });
 
+  const [exportingType, setExportingType] = React.useState<string | null>(null);
+
   const handleExport = async (type: string, store = false) => {
+    setExportingType(type);
     try {
-      const result = await fetch(`${BASE}/api/reports/export-csv?type=${type}${store ? "&store=true" : ""}`).then(r => r.json());
-      if (result.data && result.data.length > 0) {
-        const headers = Object.keys(result.data[0]);
-        const rows = result.data.map((row: Record<string, unknown>) =>
-          headers.map(h => {
-            const v = row[h];
-            if (v === null || v === undefined) return "";
-            const str = String(v);
-            return str.includes(",") ? `"${str}"` : str;
-          }).join(",")
-        );
-        const csv = [headers.join(","), ...rows].join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${type}_report.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast({
-          title: "Exported",
-          description: store && result.storedExport
-            ? `${result.rowCount} ${type} records downloaded and stored.`
-            : `${result.rowCount} ${type} records downloaded.`,
-        });
+      const res = await fetch(`${BASE}/api/reports/export-csv?type=${type}${store ? "&store=true" : ""}`);
+      if (!res.ok) {
+        toast({ title: "Export failed", description: `Server returned ${res.status}. Please try again.`, variant: "destructive" });
+        return;
       }
+      const result = await res.json() as { data?: Record<string, unknown>[]; rowCount?: number; storedExport?: unknown };
+      if (!result.data || result.data.length === 0) {
+        toast({ title: "No data to export", description: `No ${type.replace(/_/g, " ")} records yet. Upload and import files first.`, variant: "destructive" });
+        return;
+      }
+      const headers = Object.keys(result.data[0]);
+      const rows = result.data.map((row: Record<string, unknown>) =>
+        headers.map(h => {
+          const v = row[h];
+          if (v === null || v === undefined) return "";
+          const str = String(v);
+          return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+        }).join(",")
+      );
+      const csv = [headers.join(","), ...rows].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${type}_report.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Exported",
+        description: store && result.storedExport
+          ? `${result.rowCount} ${type.replace(/_/g, " ")} records downloaded and stored.`
+          : `${result.rowCount} ${type.replace(/_/g, " ")} records downloaded.`,
+      });
     } catch {
-      toast({ title: "Export failed", description: "Could not generate export.", variant: "destructive" });
+      toast({ title: "Export failed", description: "Could not generate export. Check your connection.", variant: "destructive" });
+    } finally {
+      setExportingType(null);
     }
   };
+
 
   const score = data?.verificationScore ?? 0;
   const scoreColor = score >= 85 ? "text-success" : score >= 60 ? "text-warning" : "text-destructive";
@@ -149,7 +163,8 @@ export default function ReportsPage() {
                 </div>
                 <button
                   onClick={() => handleExport(ex.type)}
-                  className="fv-brand-accent-bg flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                  disabled={exportingType === ex.type}
+                  className="fv-brand-accent-bg flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Download className="w-3.5 h-3.5" />
                   CSV
@@ -169,21 +184,62 @@ export default function ReportsPage() {
       >
         <div className="flex items-start gap-3">
           <BarChart3 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-          <div>
+          <div className="flex-1">
             <div className="text-sm font-semibold mb-1">CA Handoff Package</div>
             <p className="text-xs text-muted-foreground mb-3">
               When your verification score is ≥85, generate a complete CA handoff package with all verified
               transactions, resolved flags, and supporting documentation linked to each entry.
             </p>
-            <button
-              onClick={() => {
-                void Promise.all(["ca_ready", "missing_invoices", "risks", "reconciliation"].map(type => handleExport(type, true)));
-              }}
-              className="fv-brand-accent-bg flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Export All for CA
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  void Promise.all(["ca_ready", "missing_invoices", "risks", "reconciliation"].map(type => handleExport(type, true)));
+                }}
+                className="fv-brand-accent-bg flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Export All CSVs
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`${BASE}/api/reports/export-ca-pack`, {
+                      method: "POST",
+                      headers: { Accept: "application/pdf" },
+                    });
+                    if (!response.ok) {
+                      const err = (await response.json().catch(() => ({}))) as { blockers?: string[] };
+                      toast({
+                        title: "CA Pack blocked",
+                        description: (err.blockers ?? []).join(" ") || "Resolve open items before exporting.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    const month = data?.month?.toLowerCase().replace(/\s+/g, "-") ?? "ca-pack";
+                    a.download = `finverify-ca-pack-${month}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    toast({
+                      title: "CA Pack PDF downloaded",
+                      description: "Potential risks need CA review. Not legal or tax advice.",
+                    });
+                  } catch {
+                    toast({ title: "Download failed", description: "Please try again.", variant: "destructive" });
+                  }
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-primary text-primary hover:bg-primary/10 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                Download CA Pack PDF
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>

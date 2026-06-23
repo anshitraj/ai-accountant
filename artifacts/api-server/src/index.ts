@@ -4,7 +4,6 @@ import { logger } from "./lib/logger";
 import { validateServerEnv } from "./server/envValidation";
 
 const rawPort = process.env["PORT"] ?? "8080";
-
 const port = Number(rawPort);
 
 validateServerEnv();
@@ -20,4 +19,5 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  // No keep-alive pinger needed — Neon HTTP driver has no TCP cold-start.
 });

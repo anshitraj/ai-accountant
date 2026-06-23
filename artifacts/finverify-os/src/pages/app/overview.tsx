@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import {
   Area,
@@ -14,12 +15,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, ArrowUpRight, FileText, Upload, WalletCards, Zap, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, FileText, Loader2, Package, Upload, WalletCards, Zap, type LucideIcon } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
+import HealthWidget from "@/components/app/HealthWidget";
 import StatusBadge from "@/components/app/StatusBadge";
 import { EmptyState, PageTransition, ScoreCard, StatCard } from "@/components/app/finverify-ui";
 import { getUser } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { useToast } from "@/hooks/use-toast";
 
 interface OverviewStats {
   verificationScore: number;
@@ -39,6 +42,35 @@ interface OverviewStats {
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const CHART_COLORS = ["#065F46", "#0D9488", "#F97F06", "#DC2626", "#78716C"];
+
+function GenerateCaPackButton({ navigate }: { navigate: (to: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
+  const handle = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(`${BASE}/api/reconciliation/finalize`, { method: "POST" });
+      const d = await res.json() as { ok: boolean; pending: number; approved: number; message: string };
+      if (d.pending > 0) {
+        toast({ title: `${d.pending} items still pending`, description: d.message, variant: "destructive" });
+        navigate("/app/action-items");
+      } else {
+        toast({ title: "✓ CA pack ready", description: `${d.approved} matches approved. Check Action Items for reports.` });
+        navigate("/app/action-items");
+      }
+    } catch {
+      toast({ title: "Could not generate pack", description: "Check API connection.", variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button type="button" onClick={handle} disabled={busy} className="fv-button-primary">
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
+      Generate CA pack
+    </button>
+  );
+}
 
 export default function OverviewPage() {
   const [, navigate] = useLocation();
@@ -88,10 +120,12 @@ export default function OverviewPage() {
     { label: "Unverified entries", value: data.unverifiedTransactions, tone: "info" as const, href: "/app/reconciliation" },
   ];
   const quickActions: Array<{ label: string; href: string; icon: LucideIcon }> = [
-    { label: "Upload bank statement", href: "/app/uploads", icon: Upload },
-    { label: "Run reconciliation", href: "/app/reconciliation", icon: Zap },
-    { label: "Review potential risks", href: "/app/gst-tds-risks", icon: AlertTriangle },
-    { label: "Open CA review queue", href: "/app/ca-review", icon: ArrowUpRight },
+    { label: "Upload files", href: "/app/uploads", icon: Upload },
+    { label: "Verify finances", href: "/app/verify", icon: Zap },
+    { label: "Review risks", href: "/app/gst-tds-risks", icon: AlertTriangle },
+    { label: "Action Items", href: "/app/action-items", icon: ArrowUpRight },
+    { label: "Statutory calendar", href: "/app/statutory-calendar", icon: WalletCards },
+    { label: "Vendor aging", href: "/app/vendor-aging", icon: FileText },
   ];
 
   return (
@@ -100,12 +134,17 @@ export default function OverviewPage() {
         title="Finance Control Room"
         subtitle={`${user?.company ?? "Current workspace"} / upload-based finance verification from your database.`}
         actions={
-          <button type="button" onClick={() => navigate("/app/uploads")} className="fv-button-primary">
-            <Upload className="h-4 w-4" />
-            Upload files
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => navigate("/app/uploads")} className="fv-button-secondary">
+              <Upload className="h-4 w-4" />
+              Upload files
+            </button>
+            <GenerateCaPackButton navigate={navigate} />
+          </div>
         }
       />
+
+      <div className="mb-5"><HealthWidget /></div>
 
       <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
         <ScoreCard score={score} status={caStatus} description={scoreDescription} />

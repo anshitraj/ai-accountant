@@ -160,17 +160,22 @@ export function ScoreCard({
   );
 }
 
-export function ConfidenceBar({ score, label = true }: { score: number; label?: boolean }) {
-  const color = score >= 85 ? "bg-success" : score >= 60 ? "bg-warning" : "bg-destructive";
+export function ConfidenceBar({ score, label = true }: { score: number | null | undefined; label?: boolean }) {
+  if (score === null || score === undefined) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  const pct = Math.max(0, Math.min(100, score));
+  const color = pct >= 85 ? "bg-success" : pct >= 60 ? "bg-warning" : "bg-destructive";
   return (
     <div className="flex items-center gap-2">
       <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
-        <div className={cn("h-full rounded-full", color)} style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
+        <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
       </div>
-      {label && <span className="w-7 text-xs font-medium text-muted-foreground">{score}</span>}
+      {label && <span className="w-7 text-xs font-medium tabular-nums text-muted-foreground">{pct}</span>}
     </div>
   );
 }
+
 
 export function EmptyState({
   icon: Icon = FileQuestion,

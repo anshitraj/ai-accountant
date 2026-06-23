@@ -396,6 +396,20 @@ router.get("/users", requirePermission("settings.manage_company"), async (req, r
   })));
 });
 
+router.post("/roles/backfill", requirePermission("settings.manage_company"), async (req, res): Promise<void> => {
+  const companyId = getCompanyId(req);
+  const existing = await db.select({ role: rolePermissionsTable.role, permission: rolePermissionsTable.permission })
+    .from(rolePermissionsTable)
+    .where(eq(rolePermissionsTable.companyId, companyId));
+  const existingKeys = new Set(existing.map(e => `${e.role}:${e.permission}`));
+  const desired = defaultRolePermissions(companyId);
+  const missing = desired.filter(d => !existingKeys.has(`${d.role}:${d.permission}`));
+  if (missing.length > 0) {
+    await db.insert(rolePermissionsTable).values(missing);
+  }
+  res.json({ ok: true, inserted: missing.length });
+});
+
 router.get("/roles", requirePermission("settings.manage_company"), async (req, res): Promise<void> => {
   const permissions = await db.select().from(rolePermissionsTable).where(eq(rolePermissionsTable.companyId, getCompanyId(req))).orderBy(rolePermissionsTable.role);
   const grouped = permissions.reduce<Record<string, Array<{ permission: string; enabled: boolean }>>>((acc, item) => {

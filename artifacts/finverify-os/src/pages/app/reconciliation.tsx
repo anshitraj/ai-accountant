@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { CheckCircle, Send, XCircle, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarDays, CheckCircle, FileCheck2, FolderOpen, HelpCircle, Send, XCircle, Zap } from "lucide-react";
+import { useLocation } from "wouter";
+import { APP_ROUTES } from "@/lib/routes";
 import PageHeader from "@/components/app/PageHeader";
 import StatusBadge from "@/components/app/StatusBadge";
 import { ConfidenceBar, EmptyState, PageTransition } from "@/components/app/finverify-ui";
+import ReconciliationGuide from "@/components/reconciliation/ReconciliationGuide";
 import { formatCurrencyFull, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 
@@ -40,6 +43,20 @@ interface RunResult {
   newPotential: number;
   newUnverified: number;
   message: string;
+  runId?: string;
+}
+
+interface ReconciliationFolder {
+  runId: string;
+  name: string;
+  title: string;
+  runType: string;
+  status: string;
+  createdAt: string;
+  completedAt?: string | null;
+  matchCount: number;
+  sourceFiles: string[];
+  sourceTypes: string[];
 }
 
 function DetailBlock({ title, children }: { title: string; children: React.ReactNode }) {
@@ -55,17 +72,44 @@ export default function ReconciliationPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [filter, setFilter] = useState("all");
+  const [confirmRunOpen, setConfirmRunOpen] = useState(false);
+  const [activeRunId, setActiveRunId] = useState<string | null>(() => {
+    try { return localStorage.getItem("finverify.activeWorkspace"); } catch { return null; }
+  });
+
+  // Sync with global WorkspacePill selection
+  useEffect(() => {
+    const onChange = (e: Event) => setActiveRunId((e as CustomEvent).detail);
+    window.addEventListener("workspace-changed", onChange);
+    return () => window.removeEventListener("workspace-changed", onChange);
+  }, []);
+
+  const { data: folders = [] } = useQuery<ReconciliationFolder[]>({
+    queryKey: ["reconciliation-runs"],
+    queryFn: () => fetch(`${BASE}/api/reconciliation/runs`).then(r => r.json()),
+  });
+
+  useEffect(() => {
+    if (!activeRunId && folders.some(folder => folder.matchCount > 0)) {
+      setActiveRunId(folders.find(folder => folder.matchCount > 0)?.runId ?? null);
+    }
+  }, [activeRunId, folders]);
+
+  const activeFolder = folders.find(folder => folder.runId === activeRunId) ?? null;
 
   const { data = [], isLoading } = useQuery<ReconciliationMatch[]>({
-    queryKey: ["reconciliation"],
-    queryFn: () => fetch(`${BASE}/api/reconciliation`).then(r => r.json()),
+    queryKey: ["reconciliation", activeRunId ?? "all"],
+    queryFn: () => fetch(`${BASE}/api/reconciliation${activeRunId ? `?runId=${encodeURIComponent(activeRunId)}` : ""}`).then(r => r.json()),
   });
 
   const runMutation = useMutation({
     mutationFn: () => fetch(`${BASE}/api/reconciliation/run`, { method: "POST" }).then(r => r.json()) as Promise<RunResult>,
     onSuccess: result => {
       qc.invalidateQueries({ queryKey: ["reconciliation"] });
+      qc.invalidateQueries({ queryKey: ["reconciliation-runs"] });
       qc.invalidateQueries({ queryKey: ["overview"] });
+      if (result.runId) setActiveRunId(result.runId);
+      setConfirmRunOpen(false);
       toast({ title: "Reconciliation complete", description: result.message });
     },
   });
@@ -87,25 +131,195 @@ export default function ReconciliationPage() {
     },
   });
 
+  const needsInfoMutation = useMutation({
+    mutationFn: (id: number) => fetch(`${BASE}/api/reconciliation/${id}/needs-info`, { method: "POST" }).then(r => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reconciliation"] });
+      toast({ title: "Marked: Needs more info", description: "Match moved to CA review queue." });
+    },
+  });
+
+  const sendToCaMutation = useMutation({
+    mutationFn: (id: number) => fetch(`${BASE}/api/reconciliation/${id}/send-to-ca`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).then(r => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reconciliation"] });
+      qc.invalidateQueries({ queryKey: ["action-history"] });
+      toast({ title: "Sent to CA review", description: "Item added to CA Review queue." });
+    },
+  });
+
+  const finalizeMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`${BASE}/api/reconciliation/finalize`, { method: "POST" });
+      const result = await r.json() as { ok: boolean; message: string; pending: number };
+      if (!result.ok) return { result, pdfDownloaded: false };
+      try {
+        const pdfRes = await fetch(`${BASE}/api/reports/export-ca-pack?format=pdf`, {
+          method: "POST",
+          headers: { Accept: "application/pdf" },
+        });
+        if (pdfRes.ok) {
+          const blob = await pdfRes.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `finverify-ca-pack-${new Date().toISOString().slice(0, 10)}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          return { result, pdfDownloaded: true };
+        }
+      } catch {
+        // fall through — JSON pack still available on Reports page
+      }
+      return { result, pdfDownloaded: false };
+    },
+    onSuccess: ({ result, pdfDownloaded }) => {
+      qc.invalidateQueries({ queryKey: ["action-history"] });
+      qc.invalidateQueries({ queryKey: ["reconciliation"] });
+      toast({
+        title: result.ok ? "CA-ready pack generated" : "Still pending review",
+        description: pdfDownloaded ? `${result.message} PDF downloaded.` : result.message,
+      });
+      if (result.ok && !pdfDownloaded) navigate(APP_ROUTES.reports);
+    },
+  });
+
+  const [, navigate] = useLocation();
+
   const filtered = filter === "all" ? data : data.filter(match => match.status === filter);
   const pending = data.filter(match => match.status === "pending").length;
   const approved = data.filter(match => match.status === "approved").length;
+  const needsInfo = data.filter(match => match.status === "needs_info").length;
 
   return (
     <PageTransition className="mx-auto max-w-7xl">
       <PageHeader
-        title="Reconciliation"
-        subtitle={`${data.length} matches / ${pending} pending review / ${approved} approved. Bank transaction to invoice or ledger matching remains rules-first.`}
+        title={activeFolder?.name ?? "Reconciliation"}
+        subtitle={`${data.length} suggested matches / ${pending} pending CA review / ${approved} approved / ${needsInfo} needs more info. Each match needs CA review before the final report.`}
         actions={
-          <button type="button" onClick={() => runMutation.mutate()} disabled={runMutation.isPending} className="fv-button-primary disabled:opacity-60">
-            <Zap className="h-4 w-4" />
-            {runMutation.isPending ? "Running..." : "Run reconciliation"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setConfirmRunOpen(true)} disabled={runMutation.isPending} className="fv-button-secondary disabled:opacity-60">
+              <Zap className="h-4 w-4" />
+              {runMutation.isPending ? "Running..." : "Open preflight"}
+            </button>
+            <button
+              type="button"
+              onClick={() => finalizeMutation.mutate()}
+              disabled={finalizeMutation.isPending || data.length === 0}
+              className="fv-button-primary disabled:opacity-60"
+              title={pending > 0 ? `${pending} pending review` : "All matches reviewed"}
+            >
+              <FileCheck2 className="h-4 w-4" />
+              {finalizeMutation.isPending ? "Finalizing..." : "Generate CA-ready Report"}
+            </button>
+          </div>
         }
       />
 
+      <ReconciliationGuide />
+
+      <div className="mb-5 rounded-2xl border border-border bg-card">
+        <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-foreground">Reconciliation folders</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Each run is kept by date and source files, so Bank/Tally checks stay separate.
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground">{folders.length} folder{folders.length === 1 ? "" : "s"}</div>
+        </div>
+        {folders.length === 0 ? (
+          <div className="px-5 py-6 text-sm text-muted-foreground">No reconciliation folders yet. Run reconciliation to create Reconciliation 1.</div>
+        ) : (
+          <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => setActiveRunId(null)}
+              className={`rounded-xl border p-4 text-left transition ${
+                activeRunId === null ? "border-primary/40 bg-primary/5" : "border-border bg-background hover:border-primary/30"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <FolderOpen className="h-4 w-4 text-primary" />
+                    All matches
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">Legacy and current reconciliation suggestions</div>
+                </div>
+                <span className="rounded-full border border-border bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">All</span>
+              </div>
+            </button>
+            {folders.map(folder => {
+              const active = folder.runId === activeRunId;
+              const sourceLabel = folder.sourceFiles.length > 0
+                ? folder.sourceFiles.slice(0, 2).join(" + ")
+                : folder.sourceTypes.length > 0
+                  ? folder.sourceTypes.join(" + ")
+                  : "All imported records";
+              return (
+                <button
+                  key={folder.runId}
+                  type="button"
+                  onClick={() => setActiveRunId(folder.runId)}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    active ? "border-primary/40 bg-primary/5" : "border-border bg-background hover:border-primary/30"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <FolderOpen className="h-4 w-4 text-primary" />
+                        {folder.name}
+                      </div>
+                      <div className="mt-1 truncate text-xs text-muted-foreground" title={sourceLabel}>{sourceLabel}</div>
+                    </div>
+                    <StatusBadge status={folder.status} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      {formatDate(folder.createdAt)}
+                    </span>
+                    <span>{folder.matchCount} match{folder.matchCount === 1 ? "" : "es"}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {confirmRunOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-xl">
+            <div className="text-base font-bold text-foreground">Run reconciliation preflight</div>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              This will compare imported bank records against available invoices and ledger entries. For source-specific runs, use the Smart Next Step panel in Upload Center.
+            </p>
+            <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+              {["Match by amount", "Match by date", "Match by party/vendor name", "Match by reference/UTR if available", "Detect unmatched bank transactions", "Detect missing documents"].map(option => (
+                <label key={option} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                  <input type="checkbox" checked readOnly className="accent-primary" />
+                  {option}
+                </label>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" onClick={() => setConfirmRunOpen(false)} className="fv-button-secondary">Cancel</button>
+              <button type="button" onClick={() => runMutation.mutate()} disabled={runMutation.isPending} className="fv-button-primary">
+                <Zap className="h-4 w-4" />
+                Generate Reconciliation Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-5 flex flex-wrap gap-2">
-        {["all", "pending", "approved", "rejected"].map(item => (
+        {["all", "pending", "approved", "rejected", "needs_info"].map(item => (
           <button
             key={item}
             type="button"
@@ -139,15 +353,18 @@ export default function ReconciliationPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <ConfidenceBar score={match.confidenceScore} />
-                  {match.status === "pending" && (
+                  {(match.status === "pending" || match.status === "needs_info") && (
                     <>
-                      <button type="button" onClick={() => approveMutation.mutate(match.id)} disabled={approveMutation.isPending} className="rounded-xl bg-success/10 p-2 text-success hover:bg-success/20" aria-label="Approve match">
+                      <button type="button" onClick={() => approveMutation.mutate(match.id)} disabled={approveMutation.isPending} className="rounded-xl bg-success/10 p-2 text-success hover:bg-success/20" aria-label="Mark correct" title="Correct">
                         <CheckCircle className="h-4 w-4" />
                       </button>
-                      <button type="button" onClick={() => rejectMutation.mutate(match.id)} disabled={rejectMutation.isPending} className="rounded-xl bg-destructive/10 p-2 text-destructive hover:bg-destructive/20" aria-label="Reject match">
+                      <button type="button" onClick={() => rejectMutation.mutate(match.id)} disabled={rejectMutation.isPending} className="rounded-xl bg-destructive/10 p-2 text-destructive hover:bg-destructive/20" aria-label="Mark wrong" title="Wrong">
                         <XCircle className="h-4 w-4" />
                       </button>
-                      <button type="button" className="fv-status-review rounded-xl p-2 hover:opacity-85" aria-label="Send to CA">
+                      <button type="button" onClick={() => needsInfoMutation.mutate(match.id)} disabled={needsInfoMutation.isPending} className="rounded-xl bg-warning/10 p-2 text-warning hover:bg-warning/20" aria-label="Needs more info" title="Needs more info">
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
+                      <button type="button" onClick={() => sendToCaMutation.mutate(match.id)} disabled={sendToCaMutation.isPending} className="fv-status-review rounded-xl p-2 hover:opacity-85" aria-label="Send to CA" title="Send to CA review">
                         <Send className="h-4 w-4" />
                       </button>
                     </>

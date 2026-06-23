@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { GitMerge } from "lucide-react";
+import { GitMerge, ArrowRight, FolderOpen } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
 import StatusBadge from "@/components/app/StatusBadge";
 import { formatCurrencyFull, formatDate } from "@/lib/format";
+import { APP_ROUTES } from "@/lib/routes";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -21,20 +24,70 @@ interface LedgerEntry {
   linkedInvoiceId?: number | null;
 }
 
+interface WorkspaceRun {
+  id: string;
+  title: string;
+}
+
 export default function LedgerMatchPage() {
+  const [, navigate] = useLocation();
+  const [activeRunId, setActiveRunId] = useState<string | null>(() => {
+    try { return localStorage.getItem("finverify.activeWorkspace"); } catch { return null; }
+  });
+
+  useEffect(() => {
+    const onChange = (e: Event) => setActiveRunId((e as CustomEvent).detail);
+    window.addEventListener("workspace-changed", onChange);
+    return () => window.removeEventListener("workspace-changed", onChange);
+  }, []);
+
+  const { data: workspaces = [] } = useQuery<WorkspaceRun[]>({
+    queryKey: ["workspaces-tally"],
+    queryFn: () => fetch(`${BASE}/api/workflow/runs?runType=bank_tally_reconciliation`).then(r => r.json()),
+  });
+
   const { data = [], isLoading } = useQuery<LedgerEntry[]>({
-    queryKey: ["ledger"],
-    queryFn: () => fetch(`${BASE}/api/ledger`).then(r => r.json()),
+    queryKey: ["ledger", activeRunId],
+    queryFn: () => fetch(`${BASE}/api/ledger${activeRunId ? `?runId=${activeRunId}` : ""}`).then(r => r.json()),
   });
 
   const matched = data.filter(e => e.status === "matched").length;
   const unmatched = data.filter(e => e.status === "unmatched").length;
+  const activeWorkspace = workspaces.find(w => w.id === activeRunId);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <PageHeader
         title="Ledger Match"
-        subtitle={`${data.length} ledger entries · ${matched} matched · ${unmatched} unmatched`}
+        subtitle={
+          activeWorkspace
+            ? `Folder: ${activeWorkspace.title} · ${data.length} ledger entries · ${matched} matched · ${unmatched} unmatched`
+            : `${data.length} ledger entries · ${matched} matched · ${unmatched} unmatched. Suggested matches are reviewed on the Reconciliation page.`
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {workspaces.length > 0 && (
+              <select
+                aria-label="Workspace folder"
+                value={activeRunId ?? ""}
+                onChange={e => {
+                  const v = e.target.value || null;
+                  setActiveRunId(v);
+                  try { v ? localStorage.setItem("finverify.activeWorkspace", v) : localStorage.removeItem("finverify.activeWorkspace"); } catch { /* ignore */ }
+                  window.dispatchEvent(new CustomEvent("workspace-changed", { detail: v }));
+                }}
+                className="fv-input w-64"
+              >
+                <option value="">All workspaces</option>
+                {workspaces.map(w => <option key={w.id} value={w.id}>📁 {w.title}</option>)}
+              </select>
+            )}
+            <button type="button" onClick={() => navigate(APP_ROUTES.reconciliation)} className="fv-button-primary">
+              <ArrowRight className="h-4 w-4" />
+              Review Matches
+            </button>
+          </div>
+        }
       />
 
       {/* Summary bar */}

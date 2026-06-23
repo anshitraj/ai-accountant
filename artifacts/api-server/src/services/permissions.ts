@@ -34,9 +34,42 @@ const CA_PERMISSIONS = [
   "reports.read",
   "reports.export",
   "reconciliation.read",
+  "reconciliation.approve",
+  "reconciliation.reject",
   "uploads.read",
   "ai.assist",
   "ca_review.process",
+] as const;
+
+const FINANCE_TEAM_PERMISSIONS = [
+  "overview.read",
+  "transactions.read",
+  "transactions.update_status",
+  "invoices.read",
+  "invoices.create",
+  "ledger.read",
+  "risks.read",
+  "payroll.read",
+  "gateway.read",
+  "reports.read",
+  "reconciliation.read",
+  "reconciliation.run",
+  "uploads.read",
+  "uploads.create",
+  "ai.assist",
+] as const;
+
+const VIEWER_PERMISSIONS = [
+  "overview.read",
+  "transactions.read",
+  "invoices.read",
+  "ledger.read",
+  "risks.read",
+  "payroll.read",
+  "gateway.read",
+  "reports.read",
+  "reconciliation.read",
+  "uploads.read",
 ] as const;
 
 export function defaultRolePermissions(companyId: number) {
@@ -44,5 +77,7 @@ export function defaultRolePermissions(companyId: number) {
     ...ALL_PERMISSIONS.map(permission => ({ companyId, role: "founder", permission, enabled: true })),
     ...ALL_PERMISSIONS.map(permission => ({ companyId, role: "admin", permission, enabled: true })),
     ...CA_PERMISSIONS.map(permission => ({ companyId, role: "ca", permission, enabled: true })),
+    ...FINANCE_TEAM_PERMISSIONS.map(permission => ({ companyId, role: "finance", permission, enabled: true })),
+    ...VIEWER_PERMISSIONS.map(permission => ({ companyId, role: "viewer", permission, enabled: true })),
   ];
 }

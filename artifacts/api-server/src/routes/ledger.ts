@@ -1,27 +1,59 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { ledgerEntriesTable } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
-import { GetLedgerEntriesResponse, GetLedgerSummaryResponse } from "@workspace/api-zod";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { GetLedgerSummaryResponse } from "@workspace/api-zod";
 import { getCompanyId, requirePermission } from "../middleware/authz";
 
 const router: IRouter = Router();
 
 async function getLedgerEntries(req: Request, res: Response): Promise<void> {
-  const entries = await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.companyId, getCompanyId(req))).orderBy(desc(ledgerEntriesTable.date));
-  res.json(GetLedgerEntriesResponse.parse(
-    entries.map(e => ({
+  const companyId = getCompanyId(req);
+  const runId = typeof req.query.runId === "string" ? req.query.runId : null;
+
+  let entries;
+  if (runId) {
+    // Filter by run via run_sources → upload_ids → ledger_entries.sourceUploadId
+    const sourcesRes = await db.execute(sql`SELECT upload_id FROM run_sources WHERE run_id = ${runId}`);
+    const uploadIds = (sourcesRes.rows as { upload_id: number | null }[])
+      .map(r => r.upload_id).filter((v): v is number => typeof v === "number");
+    if (uploadIds.length === 0) {
+      res.json([]);
+      return;
+    }
+    entries = await db.select().from(ledgerEntriesTable)
+      .where(and(eq(ledgerEntriesTable.companyId, companyId), inArray(ledgerEntriesTable.sourceUploadId, uploadIds)))
+      .orderBy(desc(ledgerEntriesTable.date));
+  } else {
+    entries = await db.select().from(ledgerEntriesTable)
+      .where(eq(ledgerEntriesTable.companyId, companyId))
+      .orderBy(desc(ledgerEntriesTable.date));
+  }
+
+  // Map DB fields → frontend LedgerEntry interface shape
+  const mapped = entries.map(e => {
+    const amt = parseFloat(e.amount as string);
+    const isDebit = (e.debitCredit ?? "").toLowerCase() === "debit";
+    return {
       id: e.id,
       date: e.date,
-      ledgerName: e.ledgerName,
-      voucherNumber: e.voucherNumber ?? null,
-      amount: parseFloat(e.amount as string),
-      debitCredit: e.debitCredit,
-      sourceTool: e.sourceTool,
+      // Frontend expects accountName + accountCode
+      accountName: e.ledgerName,
+      accountCode: e.sourceTool ?? null,
+      // Frontend expects description from voucherNumber
+      description: e.voucherNumber ?? e.ledgerName,
+      // Split single amount into debit/credit columns
+      debitAmount: isDebit ? amt : null,
+      creditAmount: !isDebit ? amt : null,
+      // Balance not stored per-row; omit so frontend shows —
+      balance: null as number | null,
       status: e.status,
-      matchedTransactionId: e.matchedTransactionId ?? null,
-    }))
-  ));
+      linkedTransactionId: e.matchedTransactionId ?? null,
+      linkedInvoiceId: null as number | null,
+    };
+  });
+
+  res.json(mapped);
 }
 
 router.get("/ledger", requirePermission("ledger.read"), getLedgerEntries);

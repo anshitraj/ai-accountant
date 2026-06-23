@@ -1,0 +1,46 @@
+# Caddyfile — HTTPS reverse proxy for FinVerify OS
+# Put this in the same directory as the Caddy binary.
+# Usage: caddy run --config Caddyfile
+#
+# For production with a real domain + Let's Encrypt:
+#   Replace "localhost" with your actual domain.
+#   Caddy auto-obtains + renews TLS certificates.
+#
+# For local HTTPS (self-signed):
+#   caddy run --config Caddyfile  (Caddy creates a local CA + trusts it)
+
+# ── Main app (HTTPS) ──────────────────────────────────────────────────────────
+localhost:443 {
+  # Proxy /api/* to the Node.js API server
+  handle /api/* {
+    reverse_proxy localhost:8080
+  }
+
+  # Proxy everything else to Vite dev server
+  handle {
+    reverse_proxy localhost:21950
+  }
+
+  # Security headers
+  header {
+    X-Frame-Options DENY
+    X-Content-Type-Options nosniff
+    X-XSS-Protection "1; mode=block"
+    Referrer-Policy strict-origin-when-cross-origin
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    -Server
+  }
+
+  log {
+    output file logs/caddy-access.log {
+      roll_size 10mb
+      roll_keep 3
+    }
+    format json
+  }
+}
+
+# ── HTTP → HTTPS redirect ─────────────────────────────────────────────────────
+localhost:80 {
+  redir https://{host}{uri} permanent
+}

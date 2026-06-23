@@ -5,6 +5,7 @@ import { Search, Download, FileText } from "lucide-react";
 import PageHeader from "@/components/app/PageHeader";
 import StatusBadge from "@/components/app/StatusBadge";
 import { formatCurrencyFull, formatDate, exportToCsv } from "@/lib/format";
+import InvoiceExtractionReviewPanel from "@/components/invoices/InvoiceExtractionReviewPanel";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -76,6 +77,8 @@ export default function InvoicesPage() {
           </button>
         }
       />
+
+      <InvoiceExtractionReviewPanel />
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-5">

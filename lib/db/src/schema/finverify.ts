@@ -71,6 +71,9 @@ export const uploadBatchesTable = pgTable("upload_batches", {
   status: text("status").notNull().default("processed"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
   recordCount: integer("record_count"),
+  // Optional upload session grouping — batches sharing a runId were uploaded together.
+  // Null = legacy upload (no session context). Non-breaking additive field.
+  runId: text("run_id"),
 });
 
 export const documentsTable = pgTable("documents", {
@@ -112,6 +115,7 @@ export const bankTransactionsTable = pgTable("bank_transactions", {
   confidenceScore: integer("confidence_score").notNull().default(0),
   matchedInvoiceId: integer("matched_invoice_id"),
   note: text("note"),
+  sourceUploadId: integer("source_upload_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -129,6 +133,7 @@ export const invoicesTable = pgTable("invoices", {
   paymentStatus: text("payment_status").notNull().default("unpaid"),
   status: text("status").notNull().default("unverified"),
   linkedTransactionId: integer("linked_transaction_id"),
+  sourceUploadId: integer("source_upload_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -143,6 +148,7 @@ export const ledgerEntriesTable = pgTable("ledger_entries", {
   sourceTool: text("source_tool").notNull().default("manual"),
   status: text("status").notNull().default("unmatched"),
   matchedTransactionId: integer("matched_transaction_id"),
+  sourceUploadId: integer("source_upload_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -156,6 +162,7 @@ export const payrollEntriesTable = pgTable("payroll_entries", {
   paymentDate: text("payment_date"),
   bankReference: text("bank_reference"),
   status: text("status").notNull().default("verified"),
+  sourceUploadId: integer("source_upload_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -172,6 +179,7 @@ export const gatewaySettlementsTable = pgTable("gateway_settlements", {
   bankReference: text("bank_reference"),
   status: text("status").notNull().default("matched"),
   bankTransactionId: integer("bank_transaction_id"),
+  sourceUploadId: integer("source_upload_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -181,6 +189,7 @@ export const reconciliationMatchesTable = pgTable("reconciliation_matches", {
   bankTransactionId: integer("bank_transaction_id"),
   invoiceId: integer("invoice_id"),
   ledgerEntryId: integer("ledger_entry_id"),
+  runId: text("run_id"),
   matchType: text("match_type").notNull(),
   confidenceScore: integer("confidence_score").notNull().default(0),
   reason: text("reason").notNull(),
@@ -216,6 +225,7 @@ export const gstRecordsTable = pgTable("gst_records", {
   gstAmount: numeric("gst_amount", { precision: 14, scale: 2 }).notNull().default("0"),
   matchStatus: text("match_status").notNull().default("unmatched"),
   riskStatus: text("risk_status").notNull().default("none"),
+  sourceUploadId: integer("source_upload_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

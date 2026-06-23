@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle, Chrome, Database, Eye, EyeOff, Github, Loader2 
 import { login } from "@/lib/auth";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const AUTH_TIMEOUT_MS = 12000;
 
 type AuthMode = "signin" | "register";
 
@@ -33,6 +34,26 @@ async function readAuthResponse(response: Response): Promise<AuthResponse> {
   return data;
 }
 
+async function authFetch(path: string, body: unknown): Promise<AuthResponse> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
+  try {
+    return await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    }).then(readAuthResponse);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Sign-in is taking too long. Please check the backend/database connection and try again.");
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 export default function LoginPage() {
   const [, navigate] = useLocation();
   const [mode, setMode] = useState<AuthMode>("signin");
@@ -56,11 +77,7 @@ export default function LoginPage() {
       const body = mode === "register"
         ? { name, companyName, email, password }
         : { email, password };
-      const data = await fetch(`${BASE}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }).then(readAuthResponse);
+      const data = await authFetch(endpoint, body);
 
       login({
         token: data.token,
@@ -85,11 +102,7 @@ export default function LoginPage() {
     setError("");
     setDemoLoading(true);
     try {
-      const data = await fetch(`${BASE}/api/auth/demo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intent: "load_demo_workspace" }),
-      }).then(readAuthResponse);
+      const data = await authFetch("/api/auth/demo", { intent: "load_demo_workspace" });
 
       login({
         token: data.token,
@@ -106,8 +119,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <div className="fv-brand-primary-bg hidden lg:flex lg:w-1/2 p-12 flex-col justify-between">
+    <div className="fv-login-shell">
+      <div className="fv-login-brand-panel">
         <div>
           <div className="flex items-center gap-2 mb-12">
             <div className="fv-brand-accent-bg w-7 h-7 rounded-lg flex items-center justify-center">
@@ -140,11 +153,11 @@ export default function LoginPage() {
         <p className="text-white/30 text-xs">(c) 2026 FinVerify OS. Upload-based finance verification.</p>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="fv-login-form-panel">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md"
+          className="fv-login-form-card"
         >
           <button
             onClick={() => navigate("/")}

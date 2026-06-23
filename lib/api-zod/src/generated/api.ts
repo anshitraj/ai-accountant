@@ -277,7 +277,8 @@ export const RunReconciliationResponse = zod.object({
   "newVerified": zod.number(),
   "newPotential": zod.number(),
   "newUnverified": zod.number(),
-  "message": zod.string()
+  "message": zod.string(),
+  "runId": zod.string().optional()
 })
 
 

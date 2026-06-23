@@ -343,6 +343,185 @@ router.patch("/ai/extractions/:id/edit", requirePermission("ai.assist"), async (
   });
 });
 
+router.post("/invoices/extract-batch", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const companyId = getCompanyId(req);
+
+  const uploadBatches = await db.select().from(uploadBatchesTable).where(and(
+    eq(uploadBatchesTable.companyId, companyId),
+  ));
+  const invoiceUploads = uploadBatches.filter(u => isInvoiceUploadSource(u.sourceType));
+  const invoiceUploadIds = invoiceUploads.map(u => u.id);
+
+  if (invoiceUploadIds.length === 0) {
+    res.json({ ok: true, processed: 0, skipped: 0, errors: [], message: "No invoice uploads found." });
+    return;
+  }
+
+  const docs = await db.select().from(documentsTable).where(and(
+    eq(documentsTable.companyId, companyId),
+    eq(documentsTable.extractedTextStatus, "text_extracted"),
+  ));
+  const invoiceDocs = docs.filter(d => invoiceUploadIds.includes(d.uploadBatchId ?? -1));
+
+  const existingExtractions = await db.select({ uploadId: aiExtractionsTable.uploadId }).from(aiExtractionsTable).where(
+    eq(aiExtractionsTable.companyId, companyId)
+  );
+  const alreadyExtractedUploadIds = new Set(existingExtractions.map(e => e.uploadId).filter(Boolean));
+
+  const docsToProcess = invoiceDocs.filter(d => !alreadyExtractedUploadIds.has(d.uploadBatchId ?? -1));
+
+  let processed = 0;
+  let skipped = invoiceDocs.length - docsToProcess.length;
+  const errors: string[] = [];
+  const results: unknown[] = [];
+
+  for (const doc of docsToProcess) {
+    const metadata = (doc.detectedColumns ?? {}) as Record<string, unknown>;
+    const extractedText = typeof metadata.textPreview === "string" ? metadata.textPreview : "";
+
+    if (!extractedText.trim()) {
+      skipped++;
+      continue;
+    }
+
+    try {
+      const result = await extractInvoiceFields({
+        uploadId: doc.uploadBatchId,
+        companyId,
+        userId: req.auth?.userId,
+        extractedText,
+        fileName: doc.fileName,
+      });
+
+      const [extraction] = await db.insert(aiExtractionsTable).values({
+        companyId,
+        uploadId: doc.uploadBatchId,
+        entityType: "invoice",
+        entityId: null,
+        provider: result.provider,
+        model: result.model ?? null,
+        purpose: "invoice_extraction",
+        extractedJson: result.data,
+        confidence: String(result.confidence),
+        status: "extracted_pending_review",
+        createdBy: req.auth?.userId ?? null,
+      }).returning();
+
+      await auditAIAction({
+        companyId,
+        userId: req.auth?.userId,
+        actorEmail: req.auth?.email,
+        action: "ai.invoice_extraction_batch",
+        entityId: extraction.id,
+        metadata: { uploadId: doc.uploadBatchId, provider: result.provider, confidence: result.confidence },
+        ipAddress: req.ip,
+      });
+
+      processed++;
+      results.push({
+        extractionId: extraction.id,
+        uploadId: doc.uploadBatchId,
+        fileName: doc.fileName,
+        provider: result.provider,
+        confidence: result.confidence,
+        status: "extracted_pending_review",
+        label: "AI extracted — pending review",
+      });
+    } catch (err) {
+      errors.push(`${doc.fileName}: ${err instanceof Error ? err.message : "extraction failed"}`);
+    }
+  }
+
+  res.json({
+    ok: true,
+    processed,
+    skipped,
+    errors,
+    results,
+    message: processed > 0
+      ? `${processed} invoice${processed > 1 ? "s" : ""} extracted — pending review. Results are AI suggestions only.`
+      : "No new invoice PDFs to extract.",
+  });
+});
+
+router.get("/invoices/extractions/pending", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const companyId = getCompanyId(req);
+  const extractions = await db.select().from(aiExtractionsTable).where(and(
+    eq(aiExtractionsTable.companyId, companyId),
+    eq(aiExtractionsTable.status, "extracted_pending_review"),
+  ));
+
+  const uploadIds = extractions.map(e => e.uploadId).filter(Boolean) as number[];
+  const batches = uploadIds.length > 0
+    ? await db.select().from(uploadBatchesTable).where(and(eq(uploadBatchesTable.companyId, companyId)))
+    : [];
+  const batchMap = Object.fromEntries(batches.map(b => [b.id, b]));
+
+  res.json({
+    count: extractions.length,
+    extractions: extractions.map(e => ({
+      id: e.id,
+      uploadId: e.uploadId ?? null,
+      fileName: e.uploadId ? (batchMap[e.uploadId]?.fileName ?? null) : null,
+      provider: e.provider,
+      model: e.model ?? null,
+      confidence: parseFloat(String(e.confidence)),
+      status: e.status,
+      label: "AI extracted — pending review",
+      data: e.extractedJson,
+      createdAt: e.createdAt.toISOString(),
+    })),
+  });
+});
+
+router.post("/invoices/extractions/bulk-action", requirePermission("ai.assist"), async (req, res): Promise<void> => {
+  const companyId = getCompanyId(req);
+  const { action, ids } = req.body as { action: "accept" | "reject" | "send_to_ca"; ids: number[] };
+
+  if (!["accept", "reject", "send_to_ca"].includes(action) || !Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: "action must be accept|reject|send_to_ca and ids must be a non-empty array" });
+    return;
+  }
+
+  const results: { id: number; status: string }[] = [];
+  const errors: string[] = [];
+
+  for (const id of ids) {
+    try {
+      if (action === "accept") {
+        const extraction = await loadExtraction(id, companyId);
+        if (!extraction) { errors.push(`${id}: not found`); continue; }
+        const parsed = invoiceExtractionSchema.safeParse(extraction.extractedJson);
+        if (!parsed.success) { errors.push(`${id}: invalid JSON`); continue; }
+        const invoiceValues = invoiceValuesFromExtraction({ companyId, extraction, data: parsed.data });
+        if (!invoiceValues.ok) { errors.push(`${id}: missing fields ${invoiceValues.missing.join(",")}`); continue; }
+        const [invoice] = await db.insert(invoicesTable).values(invoiceValues.values).returning();
+        await db.update(aiExtractionsTable).set({ status: "accepted", entityId: invoice.id }).where(and(eq(aiExtractionsTable.id, id), eq(aiExtractionsTable.companyId, companyId)));
+        results.push({ id, status: "accepted" });
+      } else if (action === "reject") {
+        await db.update(aiExtractionsTable).set({ status: "rejected" }).where(and(eq(aiExtractionsTable.id, id), eq(aiExtractionsTable.companyId, companyId)));
+        results.push({ id, status: "rejected" });
+      } else if (action === "send_to_ca") {
+        await db.update(aiExtractionsTable).set({ status: "sent_to_ca_review" }).where(and(eq(aiExtractionsTable.id, id), eq(aiExtractionsTable.companyId, companyId)));
+        results.push({ id, status: "sent_to_ca_review" });
+      }
+    } catch (err) {
+      errors.push(`${id}: ${err instanceof Error ? err.message : "unknown error"}`);
+    }
+  }
+
+  await auditAIAction({
+    companyId,
+    userId: req.auth?.userId,
+    actorEmail: req.auth?.email,
+    action: `ai.bulk_extraction_${action}`,
+    metadata: { ids, results, errors },
+    ipAddress: req.ip,
+  });
+
+  res.json({ ok: true, action, results, errors });
+});
+
 router.post("/dev/test-ai-extraction", async (_req, res): Promise<void> => {
   if (process.env.NODE_ENV === "production") {
     res.status(404).json({ error: "Not found" });

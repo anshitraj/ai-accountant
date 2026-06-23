@@ -1,0 +1,11 @@
+Date,Particulars,Vch Type,Vch No.,Debit,Credit,Narration
+01/05/2026,ACME Corp,Payment,PMT-1001,5000.00,,Payment against INV-100
+03/05/2026,Salary Account,Payroll,PAY-2026,,75000.00,Salary credit May 2026
+05/05/2026,Razorpay Income,Receipt,RCP-9988,,12500.00,Gateway settlement
+07/05/2026,Office Supplies Ltd,Purchase,PUR-007,2300.00,,Office supplies
+10/05/2026,Vendor Name Pvt Ltd,Payment,PMT-1002,8750.00,,Vendor payment
+12/05/2026,Client XYZ,,RCP-0111,,45000.00,Invoice receipt
+15/05/2026,Cash Withdrawal,Contra,CON-001,20000.00,,ATM withdrawal
+18/05/2026,Google Workspace,Expense,EXP-001,4200.00,,SaaS subscription
+20/05/2026,Payment Received,Receipt,RCP-0222,,18000.00,Client payment
+25/05/2026,Salary Batch 2,Payroll,PAY-2026B,55000.00,,Second salary batch

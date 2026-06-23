@@ -20,6 +20,53 @@ export function geminiConfig(model?: string): AIProviderConfig {
   };
 }
 
+export async function callGeminiVision(
+  prompt: string,
+  imageBuffer: Buffer,
+  mimeType: string,
+  config: AIProviderConfig,
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GENAI_API_KEY;
+  if (!apiKey) throw new Error("gemini_missing_api_key");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inlineData: { mimeType, data: imageBuffer.toString("base64") } },
+              { text: prompt },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 2048,
+        },
+      }),
+    });
+
+    const payload = await response.json() as GeminiResponse;
+    if (!response.ok) {
+      throw new Error(payload.error?.message || `gemini_http_${response.status}`);
+    }
+
+    const text = payload.candidates?.[0]?.content?.parts?.map(p => p.text ?? "").join("").trim();
+    if (!text) throw new Error("gemini_empty_response");
+    return text;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function callGeminiProvider(prompt: string, config: AIProviderConfig): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GENAI_API_KEY;
   if (!apiKey) throw new Error("gemini_missing_api_key");

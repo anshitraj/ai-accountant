@@ -9,6 +9,7 @@ import {
 import { eq } from "drizzle-orm";
 import { GetOverviewResponse } from "@workspace/api-zod";
 import { getCompanyId, requirePermission } from "../middleware/authz";
+import { queryCache } from "../lib/queryCache";
 
 const router: IRouter = Router();
 const monthFormatter = new Intl.DateTimeFormat("en-IN", { month: "short", timeZone: "Asia/Kolkata" });
@@ -45,69 +46,73 @@ function monthlyProgressFromTransactions(txns: Array<typeof bankTransactionsTabl
 
 router.get("/overview", requirePermission("overview.read"), async (req, res): Promise<void> => {
   const companyId = getCompanyId(req);
-  const txns = await db.select().from(bankTransactionsTable).where(eq(bankTransactionsTable.companyId, companyId));
-  const invoices = await db.select().from(invoicesTable).where(eq(invoicesTable.companyId, companyId));
-  const uploads = await db.select().from(uploadBatchesTable).where(eq(uploadBatchesTable.companyId, companyId)).orderBy(uploadBatchesTable.uploadedAt).limit(5);
-  const risks = await db.select().from(riskFlagsTable).where(eq(riskFlagsTable.companyId, companyId));
-  const openRisks = risks.filter(r => r.status === "open");
 
-  const verified = txns.filter(t => t.status === "verified").length;
-  const unverified = txns.filter(t => !["verified", "missing_invoice"].includes(t.status)).length;
-  const missingInvoice = txns.filter(t => t.status === "missing_invoice").length;
+  // Cache for 30s per company — overview data doesn't change between uploads
+  const response = await queryCache.get(`company:${companyId}:overview`, 30, async () => {
+    // Run all 4 queries in PARALLEL — cuts latency from 4×RTT to 1×RTT
+    const [txns, invoices, allUploads, risks] = await Promise.all([
+      db.select().from(bankTransactionsTable).where(eq(bankTransactionsTable.companyId, companyId)),
+      db.select().from(invoicesTable).where(eq(invoicesTable.companyId, companyId)),
+      db.select().from(uploadBatchesTable).where(eq(uploadBatchesTable.companyId, companyId)).orderBy(uploadBatchesTable.uploadedAt),
+      db.select().from(riskFlagsTable).where(eq(riskFlagsTable.companyId, companyId)),
+    ]);
 
-  const verifiedAmount = txns
-    .filter(t => t.status === "verified" && t.type === "credit")
-    .reduce((sum, t) => sum + parseFloat(t.amount as string), 0);
+    const uploads    = allUploads.filter(upload => upload.status !== "removed").slice(0, 5);
+    const openRisks  = risks.filter(r => r.status === "open");
 
-  const unverifiedAmount = txns
-    .filter(t => t.status !== "verified" && t.type === "credit")
-    .reduce((sum, t) => sum + parseFloat(t.amount as string), 0);
+    const verified       = txns.filter(t => t.status === "verified").length;
+    const unverified     = txns.filter(t => !["verified", "missing_invoice"].includes(t.status)).length;
+    const missingInvoice = txns.filter(t => t.status === "missing_invoice").length;
 
-  const score = txns.length > 0
-    ? Math.round((verified / txns.length) * 100)
-    : 0;
+    const verifiedAmount = txns
+      .filter(t => t.status === "verified" && t.type === "credit")
+      .reduce((sum, t) => sum + parseFloat(t.amount as string), 0);
 
-  const caReady = score >= 85 ? "Ready for CA" : score >= 60 ? "Needs Review" : "Not Ready";
+    const unverifiedAmount = txns
+      .filter(t => t.status !== "verified" && t.type === "credit")
+      .reduce((sum, t) => sum + parseFloat(t.amount as string), 0);
 
-  const riskByCategory: Record<string, { count: number; severity: string }> = {};
-  for (const r of openRisks) {
-    if (!riskByCategory[r.category]) {
-      riskByCategory[r.category] = { count: 0, severity: r.severity };
+    const score   = txns.length > 0 ? Math.round((verified / txns.length) * 100) : 0;
+    const caReady = score >= 85 ? "Ready for CA" : score >= 60 ? "Needs Review" : "Not Ready";
+
+    const riskByCategory: Record<string, { count: number; severity: string }> = {};
+    for (const r of openRisks) {
+      if (!riskByCategory[r.category]) {
+        riskByCategory[r.category] = { count: 0, severity: r.severity };
+      }
+      riskByCategory[r.category].count++;
     }
-    riskByCategory[r.category].count++;
-  }
 
-  const monthlyProgress = monthlyProgressFromTransactions(txns);
+    const recentUploads = uploads.map(u => ({
+      id: u.id,
+      companyId: u.companyId ?? null,
+      sourceType: u.sourceType,
+      fileName: u.fileName,
+      status: u.status,
+      uploadedAt: u.uploadedAt.toISOString(),
+      recordCount: u.recordCount ?? null,
+    }));
 
-  const recentUploads = uploads.map(u => ({
-    id: u.id,
-    companyId: u.companyId ?? null,
-    sourceType: u.sourceType,
-    fileName: u.fileName,
-    status: u.status,
-    uploadedAt: u.uploadedAt.toISOString(),
-    recordCount: u.recordCount ?? null,
-  }));
-
-  const response = {
-    verificationScore: score,
-    totalTransactions: txns.length,
-    verifiedTransactions: verified,
-    unverifiedTransactions: unverified,
-    missingInvoices: missingInvoice + invoices.filter(i => i.status === "unverified").length,
-    riskFlags: openRisks.length,
-    totalUploads: await db.select().from(uploadBatchesTable).where(eq(uploadBatchesTable.companyId, companyId)).then(r => r.length),
-    caReadyStatus: caReady,
-    verifiedAmount,
-    unverifiedAmount,
-    recentUploads,
-    monthlyProgress,
-    riskByCategory: Object.entries(riskByCategory).map(([category, data]) => ({
-      category,
-      count: data.count,
-      severity: data.severity,
-    })),
-  };
+    return {
+      verificationScore: score,
+      totalTransactions: txns.length,
+      verifiedTransactions: verified,
+      unverifiedTransactions: unverified,
+      missingInvoices: missingInvoice + invoices.filter(i => i.status === "unverified").length,
+      riskFlags: openRisks.length,
+      totalUploads: allUploads.filter(upload => upload.status !== "removed").length,
+      caReadyStatus: caReady,
+      verifiedAmount,
+      unverifiedAmount,
+      recentUploads,
+      monthlyProgress: monthlyProgressFromTransactions(txns),
+      riskByCategory: Object.entries(riskByCategory).map(([category, data]) => ({
+        category,
+        count: data.count,
+        severity: data.severity,
+      })),
+    };
+  });
 
   res.json(GetOverviewResponse.parse(response));
 });

@@ -20,6 +20,17 @@ export function formatDate(dateStr: string): string {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+export function formatDateTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function statusColor(status: string): string {
   const verified = "fv-status-verified";
   const unverified = "fv-status-unverified";
@@ -93,7 +104,11 @@ export function statusLabel(status: string): string {
     suspense: "Suspense",
     fee_mismatch: "Fee Mismatch",
     processed: "Processed",
+    batch_confirmed: "Imported",
     metadata_only: "Metadata only",
+    needs_ai_extraction: "Needs AI extraction",
+    needs_conversion: "Convert to CSV / Excel",
+    removed: "Removed",
     partial_payment: "Partial Payment",
     exact: "Exact Match",
     potential: "Potential Match",

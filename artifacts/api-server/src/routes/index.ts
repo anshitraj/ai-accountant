@@ -13,6 +13,15 @@ import gatewayRouter from "./gateway";
 import reportsRouter from "./reports";
 import aiRouter from "./ai";
 import platformRouter from "./platform";
+import monthlyCloseRouter from "./monthlyClose";
+import exceptionsRouter from "./exceptions";
+import actionHistoryRouter from "./actionHistory";
+import trialBalanceRouter from "./trialBalance";
+import journalEntriesRouter from "./journalEntries";
+import gstr2bRouter from "./gstr2b";
+import periodLockRouter from "./periodLock";
+import excelExportRouter from "./excelExport";
+import vendorAgingRouter from "./vendorAging";
 
 const router: IRouter = Router();
 
@@ -30,5 +39,14 @@ router.use(gatewayRouter);
 router.use(reportsRouter);
 router.use(aiRouter);
 router.use(platformRouter);
+router.use(monthlyCloseRouter);
+router.use(exceptionsRouter);
+router.use(actionHistoryRouter);
+router.use(trialBalanceRouter);
+router.use(journalEntriesRouter);
+router.use(gstr2bRouter);
+router.use(periodLockRouter);
+router.use(excelExportRouter);
+router.use(vendorAgingRouter);
 
 export default router;
